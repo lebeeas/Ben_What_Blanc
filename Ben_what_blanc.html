@@ -1,0 +1,3008 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8f7f2" />
+  <title>Ben-What Blanc — A Mugshot Mystery</title>
+  <style>
+
+    /* =========================================================================
+       Ben-What Blanc — unified stylesheet
+       One single composition is used at every viewport size. On wide screens
+       the app simply stays capped at a comfortable width and centers itself;
+       the leftover space on the sides is filled by the page background
+       (pillarboxing), and elements that have room to grow (the photo and the
+       answer grid) stretch to fill the extra height instead of the layout
+       being restructured into a different desktop-only design.
+       ========================================================================= */
+
+    :root {
+      --ink: #11100e;
+      --ink-soft: #1c1915;
+      --paper: #f3eee3;
+      --paper-strong: #f8f7f2;
+      --paper-muted: #e9e2d6;
+      --muted: #655f56;
+      --accent: #7c2026;
+      --select: #2f66c9;
+      --good: #2d6b4f;
+      --good-bg: #dde8df;
+      --bad: #9b2f38;
+      --bad-bg: #edd9db;
+      --border: #b6aea1;
+      /* Newspaper "print" look: a warm, slightly desaturated tint over the whole
+         app, and a harder black-and-white newsprint treatment for photographs. */
+      --print-filter: sepia(.05) contrast(1.04) saturate(.88) brightness(1.01);
+      --photo-print-filter: grayscale(1) contrast(1.22) brightness(1.06);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    /* One paper tone for every surface: page, side bars, header, game, footer. */
+    html { background: var(--paper); }
+    body {
+      position: relative;
+      margin: 0;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--paper);
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--ink);
+      -webkit-tap-highlight-color: transparent;
+      /* Applied here (not just on .app) so the letterbox bars on wide screens
+         get exactly the same tint as the app itself, instead of clashing. */
+      filter: var(--print-filter);
+    }
+    /* Printed-paper grain: a fixed, low-opacity noise texture over everything,
+       including the app itself, so the bars and the app read as one surface. */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: .5;
+      mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+    }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--select); outline-offset: 2px; }
+    .hidden { display: none !important; }
+
+    /* ---- App frame: fixed portrait proportions, letterboxed on wide screens --- */
+    .app {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 520px;
+      height: 100dvh;
+      max-height: 100dvh;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      background: var(--paper);
+    }
+
+    /* ---- Masthead / HUD (identical at every size). The bar itself spans the
+       full screen width; its content stays aligned with the app column. --- */
+    .brand {
+      flex: 0 0 auto;
+      position: relative;
+      left: 50%;
+      width: 100vw;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px max(14px, calc((100vw - 520px) / 2));
+      background: var(--paper);
+      border-bottom: 3px double var(--ink);
+    }
+    .app.lobby-view .brand { display: none; }
+    .brand h1 {
+      margin: 0;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 900;
+      font-size: clamp(1.15rem, 5vw, 1.55rem);
+      line-height: 1.05;
+      letter-spacing: -.01em;
+      color: var(--ink);
+    }
+    .brand .tagline { margin: 2px 0 0; color: var(--muted); font-size: .66rem; letter-spacing: .03em; }
+    .hud { flex: 0 0 auto; display: flex; align-items: stretch; gap: 7px; }
+    .score-box, .lives-box {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 54px; padding: 5px 9px;
+      border: 2px solid var(--ink); border-radius: 3px;
+      background: var(--paper-strong);
+      box-shadow: 2px 2px 0 rgba(17,16,14,.12);
+    }
+    .lives-box { min-width: 92px; }
+    .hud-label { font: 900 .52rem/1 Arial, Helvetica, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+    .score-box strong { font: 900 1.1rem/1 Arial, Helvetica, sans-serif; color: var(--ink); }
+    .hearts { display: flex; align-items: center; gap: 7px; }
+    .heart { position: relative; width: 20px; height: 20px; display: grid; place-items: center; transition: opacity .2s ease; }
+    .heart svg { width: 20px; height: 19px; }
+    .heart-shape { fill: var(--ink); }
+    .heart-stroke { fill: none; stroke: var(--paper-strong); stroke-width: 1.6; }
+    .heart .blade { display: none; }
+    .heart.lost { opacity: .25; }
+    .heart.stabbed::before, .heart.stabbed::after {
+      content: ""; position: absolute; left: 50%; top: 50%; width: 20px; height: 2px; background: var(--ink);
+    }
+    .heart.stabbed::before { transform: translate(-50%, -50%) rotate(45deg); }
+    .heart.stabbed::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+    /* ---- Card shell that holds either the lobby/loading screen or the game --- */
+    .game-shell {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--paper);
+    }
+
+    /* ---- Loading / lobby screen ---- */
+    .loading {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+    }
+    .loading-inner {
+      width: 100%;
+      min-height: 0;
+      margin: 0 auto;
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+      overflow-y: auto;
+    }
+    .lobby-title {
+      margin: 0;
+      font: 900 clamp(2rem, 9vw, 2.7rem)/1 Georgia, 'Times New Roman', serif;
+      letter-spacing: -.02em;
+      color: var(--ink);
+    }
+    .lobby-title::before {
+      content: "Public Record Edition";
+      display: block;
+      margin-bottom: 10px;
+      font: 900 .58rem/1 Arial, Helvetica, sans-serif;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .lobby-subtitle { font: 700 .85rem/1 Georgia, 'Times New Roman', serif; letter-spacing: .05em; color: var(--muted); }
+    .lobby-rules {
+      width: 100%;
+      max-width: 440px;
+      margin: 4px 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .rule-card {
+      text-align: left;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--paper-muted);
+    }
+    .rule-number { font: 900 .54rem/1 Arial, Helvetica, sans-serif; letter-spacing: .12em; color: var(--accent); }
+    .rule-card strong { display: block; margin: 4px 0 3px; font: 900 .88rem/1.1 Georgia, 'Times New Roman', serif; color: var(--ink); }
+    .rule-card span { display: block; font-size: .66rem; line-height: 1.35; color: var(--muted); }
+    .connecting-visual { display: grid; place-items: center; }
+    .loading-spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid #c7c0b4; border-top-color: var(--ink); border-right-color: var(--ink);
+      animation: spin .82s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loadingTitle { margin: 0; font: 900 clamp(1rem, 4vw, 1.28rem)/1.25 Georgia, 'Times New Roman', serif; color: var(--ink); }
+    #loadingCopy { margin: 0; font-size: .74rem; color: var(--muted); }
+    .loading-progress { width: 100%; max-width: 260px; }
+    .progress-track { height: 8px; width: 100%; border-radius: 99px; overflow: hidden; background: #d4d1ca; border: 1px solid var(--ink); }
+    .progress-fill { width: 0%; height: 100%; background: var(--accent); transition: width .2s ease; }
+    .progress-text { margin-top: 6px; font-size: .62rem; font-weight: 800; color: var(--ink); }
+    .archive-note, .ready-hint { font-size: .68rem; color: var(--muted); line-height: 1.35; }
+    .loading-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .play-gate-wrap { position: relative; display: inline-flex; min-width: 240px; }
+    .play-gate {
+      position: absolute;
+      left: 0; right: 0; top: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      min-height: 50px;
+      padding: 9px 12px 10px;
+      background: var(--paper-strong);
+      border: 2px solid var(--ink);
+      border-radius: 3px;
+      box-shadow: 3px 3px 0 rgba(17,16,14,.16);
+    }
+    .play-gate.hidden { display: none; }
+    .play-gate-lock { width: 15px; height: 15px; fill: var(--muted); }
+    .play-gate-label {
+      display: block;
+      font: 900 .56rem/1.2 Arial, Helvetica, sans-serif;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+    }
+    .play-gate-row { display: flex; gap: 6px; width: 100%; }
+    .play-gate-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 7px 9px;
+      border: 2px solid var(--ink);
+      border-radius: 3px;
+      background: var(--paper);
+      color: var(--ink);
+      font: 700 .78rem/1 Arial, Helvetica, sans-serif;
+    }
+    .play-gate-input:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+    .play-gate-submit {
+      flex: 0 0 auto;
+      padding: 7px 11px;
+      border: 2px solid var(--ink);
+      border-radius: 3px;
+      background: var(--ink);
+      color: var(--paper-strong);
+      font: 900 .64rem/1 Arial, Helvetica, sans-serif;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .play-gate-submit:hover { background: #2b2926; }
+    .play-gate-error { min-height: 1em; font-size: .6rem; font-weight: 800; color: var(--bad); }
+    .play-gate-error.hidden { display: none; }
+    .lobby-availability { max-width: 420px; margin-top: auto; padding-top: 10px; font-size: .64rem; line-height: 1.4; color: var(--muted); }
+    .inline-replay, .play-launch {
+      display: inline-block;
+      min-width: 190px;
+      min-height: 50px;
+      padding: 12px 20px;
+      border: 2px solid var(--ink);
+      border-radius: 3px;
+      background: var(--ink);
+      color: var(--paper-strong);
+      font: 900 .82rem/1 Arial, Helvetica, sans-serif;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 rgba(17,16,14,.16);
+    }
+    .inline-replay:hover:not(:disabled), .play-launch:hover:not(:disabled) {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 rgba(17,16,14,.18);
+    }
+    .play-launch:disabled { opacity: .5; cursor: wait; box-shadow: none; transform: none; }
+
+    /* Lobby-mode: hide the technical connection UI, show the front page. */
+    .loading.lobby-mode .connecting-visual,
+    .loading.lobby-mode #loadingTitle,
+    .loading.lobby-mode #loadingCopy,
+    .loading.lobby-mode .loading-progress,
+    .loading.lobby-mode .archive-note,
+    .loading.lobby-mode .ready-hint { display: none; }
+
+    /* Waiting-mode: a quiet, purely-centered spinner screen. */
+    .loading.waiting-mode .lobby-title,
+    .loading.waiting-mode .lobby-subtitle,
+    .loading.waiting-mode .lobby-rules,
+    .loading.waiting-mode .lobby-availability,
+    .loading.waiting-mode .loading-actions,
+    .loading.waiting-mode .archive-note,
+    .loading.waiting-mode .ready-hint,
+    .loading.waiting-mode .loading-progress { display: none; }
+
+    /* ---- Game view ---- */
+    #game { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; position: relative; }
+    .source-panel { display: none; }
+
+    .visual-pane { flex: 0 0 42%; min-height: 0; display: flex; flex-direction: column; gap: 7px; }
+    .round-line {
+      flex: 0 0 auto;
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .round-line strong { color: var(--ink); }
+    .round-divider { margin: 0 4px; opacity: .5; }
+    .pool-status.ready { color: var(--good); }
+    .record-meta { flex: 0 0 auto; text-align: center; }
+    .record-label, .record-source { display: none; }
+    .person-name {
+      display: block;
+      font: 900 clamp(1.02rem, 4.4vw, 1.3rem)/1.15 Georgia, 'Times New Roman', serif;
+      color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .photo-frame {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      border: 2px solid var(--ink);
+      border-radius: 3px;
+      background: var(--ink);
+    }
+    .photo-frame img {
+      max-width: 100%; max-height: 100%; width: auto; height: auto;
+      object-fit: contain; display: block; user-select: none;
+      filter: var(--photo-print-filter);
+    }
+    .photo-source-tab {
+      position: absolute; right: 0; bottom: 0; z-index: 2;
+      max-width: 55%;
+      padding: 4px 8px;
+      border-top: 1px solid var(--ink); border-left: 1px solid var(--ink);
+      background: rgba(248,247,242,.94);
+      color: var(--ink);
+      font: 800 .56rem/1 Arial, Helvetica, sans-serif;
+      letter-spacing: .05em; text-transform: uppercase;
+      text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .photo-source-tab:hover { background: var(--paper-strong); }
+
+    .play-pane { flex: 1 1 58%; min-height: 0; position: relative; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+    .question-block { flex: 0 0 auto; }
+    .question-block::before {
+      content: "The Case";
+      display: block;
+      margin-bottom: 4px;
+      font: 900 .58rem/1 Arial, Helvetica, sans-serif;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .question {
+      margin: 0;
+      font: 900 clamp(1.05rem, 4.6vw, 1.4rem)/1.18 Georgia, 'Times New Roman', serif;
+      color: var(--ink);
+    }
+    .notice { display: none; }
+
+    .answers-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .answers-placeholder {
+      flex: 1 1 auto; min-height: 140px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; border: 1px dashed var(--border); border-radius: 6px;
+      color: var(--muted); text-align: center; font-size: .78rem; line-height: 1.4;
+    }
+    .answers {
+      flex: 1 1 auto;
+      min-height: 150px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(72px, 1fr));
+      gap: 10px;
+    }
+    .answer, .help-btn {
+      border: 2px solid #28231e;
+      border-radius: 4px;
+      background: #eee8dc;
+      color: var(--ink);
+      cursor: pointer;
+      box-shadow: 2px 2px 0 rgba(17,16,14,.10);
+      transition: transform .13s ease, border-color .13s ease, background .13s ease, opacity .13s ease;
+    }
+    .answer {
+      position: relative;
+      min-height: 0;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 10px 12px 10px 46px;
+      text-align: left;
+      overflow: hidden;
+    }
+    .answer::before {
+      content: attr(data-letter);
+      position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      border: 1px solid #5b534a; border-radius: 3px;
+      background: #e0d9ce; color: var(--ink);
+      font: 900 .74rem/1 Arial, Helvetica, sans-serif;
+    }
+    .answer-label { font-size: .86rem; font-weight: 800; line-height: 1.22; color: var(--ink); }
+    .answer-meaning { margin-top: 4px; font-size: .67rem; line-height: 1.28; font-weight: 650; color: var(--muted); }
+    .answer:hover:not(:disabled), .help-btn:hover:not(:disabled) {
+      transform: translate(-1px, -1px);
+      border-color: var(--select);
+      box-shadow: 4px 4px 0 rgba(17,16,14,.14);
+    }
+    .answer:disabled { cursor: default; }
+    .answer.removed { opacity: .18; pointer-events: none; }
+    .answer.correct { border-color: var(--good) !important; background: var(--good-bg) !important; }
+    .answer.wrong { border-color: var(--bad) !important; background: var(--bad-bg) !important; }
+
+    .status { min-height: 12px; margin-top: 6px; font-size: .76rem; font-weight: 800; }
+    .status.good { color: var(--good); }
+    .status.bad { color: var(--bad); }
+    .status.warn { color: #8b641c; }
+
+    .help-panel {
+      flex: 0 0 auto;
+      position: relative;
+      padding: 10px;
+      border: 2px solid #3a332b;
+      border-radius: 4px;
+      background: var(--paper-muted);
+      box-shadow: 3px 3px 0 rgba(17,16,14,.08);
+    }
+    .help-title {
+      margin: 0 0 8px; text-align: center;
+      font: 900 .64rem/1 Arial, Helvetica, sans-serif; letter-spacing: .1em; text-transform: uppercase;
+      color: #4d4035;
+    }
+    .helps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .help-btn {
+      min-height: 62px;
+      height: auto;
+      padding: 9px 6px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px;
+      text-align: center;
+      background: #f0e9dd;
+    }
+    .help-name { font-size: .72rem; font-weight: 900; line-height: 1.15; color: var(--ink); }
+    .help-desc { display: block; font-size: .6rem; line-height: 1.3; font-weight: 650; color: var(--muted); }
+    .help-btn:disabled { opacity: .32; cursor: default; box-shadow: none; }
+    .help-prompt {
+      position: absolute;
+      left: 0; right: 0;
+      bottom: calc(100% + 8px);
+      z-index: 20;
+      padding: 9px 11px;
+      border: 1px solid #7c6e5c;
+      border-radius: 4px;
+      background: #e5ddd0;
+      box-shadow: 3px 4px 0 rgba(17,16,14,.16);
+    }
+    .help-prompt-title { margin: 0 0 3px; font: 900 .64rem/1 Arial, Helvetica, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+    .help-prompt-copy { margin: 0; font-size: .72rem; line-height: 1.4; color: #4d4035; }
+
+    /* ---- Solution / outcome: an overlay confined to the play-pane, so it never
+       resizes the rest of the UI and never covers the photo above it ---- */
+    .play-pane:has(#caseOutcome:not(.hidden))::after {
+      content: "";
+      position: absolute; inset: 0;
+      z-index: 25;
+      background: rgba(17,16,14,.55);
+    }
+    .case-outcome {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 30;
+      width: min(92%, 420px);
+      max-height: 86%;
+      overflow-y: auto;
+      padding: 20px;
+      text-align: center;
+      border: 2px solid var(--ink);
+      border-radius: 4px;
+      background: #f8f6f0;
+      box-shadow: 6px 7px 0 rgba(17,16,14,.24);
+    }
+    .case-outcome.good { border-color: var(--good); }
+    .case-outcome.bad { border-color: var(--bad); }
+    .case-outcome-title {
+      display: inline-block;
+      margin: 0 0 10px;
+      padding: 6px 11px;
+      border: 2px solid currentColor;
+      font: 900 .92rem/1 Arial, Helvetica, sans-serif;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .case-outcome.good .case-outcome-title { color: #234b2c; background: var(--good-bg); }
+    .case-outcome.bad .case-outcome-title { color: #762b34; background: var(--bad-bg); }
+    .case-outcome-score { margin: 0 0 10px; font: 900 clamp(1.5rem, 7vw, 2.1rem)/1 Arial, Helvetica, sans-serif; color: var(--ink); }
+    .case-outcome-score.hidden { display: none; }
+    .case-outcome-copy { margin: 0 0 8px; font-size: .84rem; font-weight: 700; color: var(--ink); }
+    .case-outcome-detail { margin: 0 0 14px; font-size: .76rem; line-height: 1.42; color: var(--muted); }
+
+    /* ---- Footer: also spans the full screen width ---- */
+    .footer {
+      flex: 0 0 auto;
+      position: relative;
+      left: 50%;
+      width: 100vw;
+      transform: translateX(-50%);
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px 12px; flex-wrap: wrap; text-align: center;
+      padding: 8px max(14px, calc((100vw - 520px) / 2));
+      background: var(--paper);
+      color: var(--muted);
+      font-size: .64rem; line-height: 1.3;
+      border-top: 1px solid var(--ink);
+    }
+    .footer a, .footer-link { color: var(--accent); }
+    .footer-link { border: 0; background: none; padding: 0; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+    .footer-meta { display: inline-flex; gap: 10px; }
+
+    /* ---- Legal / attribution page ---- */
+    .legal-page {
+      position: fixed; inset: 0; z-index: 100;
+      display: grid; place-items: center;
+      padding: 16px;
+      background: rgba(17,16,14,.55);
+    }
+    .legal-page.hidden { display: none; }
+    .legal-sheet {
+      width: min(640px, 100%);
+      max-height: min(88dvh, 720px);
+      overflow-y: auto;
+      background: var(--paper);
+      border: 3px double var(--ink-soft);
+      box-shadow: 8px 10px 0 rgba(17,16,14,.18);
+      color: var(--ink-soft);
+    }
+    .legal-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+      padding: 14px 16px;
+      border-bottom: 3px double var(--ink-soft);
+      background: #e8e0d1;
+    }
+    .legal-kicker { font: 900 .6rem/1 Arial, Helvetica, sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+    .legal-head h2 { margin: 5px 0 0; font: 900 clamp(1.3rem, 4vw, 1.85rem)/1 Georgia, 'Times New Roman', serif; }
+    .legal-close {
+      border: 2px solid var(--ink-soft); background: var(--paper-strong); color: var(--ink-soft);
+      min-height: 36px; padding: 6px 12px;
+      font: 900 .7rem/1 Arial, Helvetica, sans-serif;
+      cursor: pointer;
+    }
+    .legal-body { padding: 16px 18px 22px; font-size: .84rem; line-height: 1.5; }
+    .legal-body h3 { margin: 16px 0 6px; padding-top: 8px; border-top: 1px solid #756e63; font: 900 .92rem/1.1 Georgia, 'Times New Roman', serif; text-transform: uppercase; letter-spacing: .02em; }
+    .legal-body p { margin: 8px 0; }
+    .legal-body a { color: var(--accent); }
+
+    /* ---- Loss state (three mistakes made) ---- */
+    body.loss-state, body.loss-state .app, body.loss-state .brand,
+    body.loss-state .game-shell, body.loss-state .footer { background: #f2dedb; }
+    body.loss-state .brand { border-color: #4b2526; }
+    body.loss-state .score-box, body.loss-state .lives-box { border-color: #4b2526; background: #ead1ce; }
+    body.loss-state .case-outcome.bad { border-color: #8f1f29; }
+    body.loss-state .inline-replay { background: #8f1f29; }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+    /* ---- Small comfort tweaks at the very narrow end; same layout throughout --- */
+    @media (max-width: 380px) {
+      .brand { padding: 8px 10px; }
+      #game { padding: 9px; gap: 8px; }
+      .answers { gap: 7px; }
+      .helps { gap: 6px; }
+      .lobby-rules { gap: 8px; }
+    }
+    @media (max-height: 620px) {
+      .visual-pane { flex-basis: 36%; }
+      .play-pane { flex-basis: 64%; }
+      .lobby-rules { display: none; }
+    }
+</style>
+</head>
+<body>
+  <main id="app" class="app lobby-view">
+    <header class="brand">
+      <div>
+        <h1>Ben-What Blanc</h1>
+        <p class="tagline"><em>A Mugshot Mystery</em></p>
+      </div>
+      <div class="hud">
+        <div class="score-box" aria-label="Current score">
+          <span class="hud-label">Score</span>
+          <strong id="score">0</strong>
+        </div>
+        <div class="lives-box" aria-label="Lives remaining">
+          <span class="hud-label">Lives</span>
+          <span id="hearts" class="hearts" aria-label="3 lives remaining">
+            <span class="heart" aria-hidden="true"><svg viewBox="0 0 48 44" role="presentation"><path class="heart-shape" d="M24 40S6 29 4 17C2 7 8 2 15 2c4 0 7 2 9 6 2-4 5-6 9-6 7 0 13 5 11 15-2 12-20 23-20 23Z"/><path class="heart-stroke" d="M24 40S6 29 4 17C2 7 8 2 15 2c4 0 7 2 9 6 2-4 5-6 9-6 7 0 13 5 11 15-2 12-20 23-20 23Z"/></svg><span class="blade"></span></span>
+            <span class="heart" aria-hidden="true"><svg viewBox="0 0 48 44" role="presentation"><path class="heart-shape" d="M24 40S6 29 4 17C2 7 8 2 15 2c4 0 7 2 9 6 2-4 5-6 9-6 7 0 13 5 11 15-2 12-20 23-20 23Z"/><path class="heart-stroke" d="M24 40S6 29 4 17C2 7 8 2 15 2c4 0 7 2 9 6 2-4 5-6 9-6 7 0 13 5 11 15-2 12-20 23-20 23Z"/></svg><span class="blade"></span></span>
+            <span class="heart" aria-hidden="true"><svg viewBox="0 0 48 44" role="presentation"><path class="heart-shape" d="M24 40S6 29 4 17C2 7 8 2 15 2c4 0 7 2 9 6 2-4 5-6 9-6 7 0 13 5 11 15-2 12-20 23-20 23Z"/><path class="heart-stroke" d="M24 40S6 29 4 17C2 7 8 2 15 2c4 0 7 2 9 6 2-4 5-6 9-6 7 0 13 5 11 15-2 12-20 23-20 23Z"/></svg><span class="blade"></span></span>
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <section class="game-shell">
+      <div id="loading" class="loading lobby-mode">
+        <div class="loading-inner">
+          <h2 class="lobby-title">Ben-What Blanc</h2>
+          <div class="lobby-subtitle"><em>A Mugshot Mystery</em></div>
+          <div class="lobby-rules" aria-label="How to play">
+            <div class="rule-card"><div class="rule-number">01</div><strong>Study the case</strong><span>Examine the photograph and the clues.</span></div>
+            <div class="rule-card"><div class="rule-number">02</div><strong>Choose the offense</strong><span>Pick one of four documented possibilities.</span></div>
+            <div class="rule-card"><div class="rule-number">03</div><strong>Guard your lives</strong><span>Three mistakes end the investigation.</span></div>
+            <div class="rule-card rule-card-help"><div class="rule-number">04</div><strong>Use your leads</strong><span>Three one-use helps can turn the case around.</span></div>
+          </div>
+          <div id="connectingVisual" class="connecting-visual" aria-hidden="true"><div class="loading-spinner"></div></div>
+          <strong id="loadingTitle" class="loading-status-title">loading the cases from the archives</strong>
+          <p id="loadingCopy" class="loading-copy">this might take a bunch of seconds</p>
+          <div id="loadingProgress" class="loading-progress hidden" aria-live="polite">
+            <div class="progress-track" aria-hidden="true"><div id="progressFill" class="progress-fill"></div></div>
+            <div id="progressText" class="progress-text">Preparing the case…</div>
+          </div>
+          <div class="archive-note" id="archiveNote"></div>
+          <div class="loading-actions">
+            <div class="play-gate-wrap">
+              <button type="button" class="inline-replay play-launch" id="playButton">Open the case</button>
+              <div id="playGate" class="play-gate">
+                <svg class="play-gate-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7.5a5 5 0 0 1 10 0V10h.5A1.5 1.5 0 0 1 19 11.5v9A1.5 1.5 0 0 1 17.5 22h-11A1.5 1.5 0 0 1 5 20.5v-9A1.5 1.5 0 0 1 6.5 10H7Zm2 0h6V7.5a3 3 0 0 0-6 0V10Zm3 5.25a1.25 1.25 0 0 1 .75 2.25v1.5a.75.75 0 0 1-1.5 0v-1.5a1.25 1.25 0 0 1 .75-2.25Z"/></svg>
+                <label class="play-gate-label" for="gateInput">Password required to open the case</label>
+                <div class="play-gate-row">
+                  <input id="gateInput" class="play-gate-input" type="password" autocomplete="off" spellcheck="false" placeholder="Password" aria-label="Password" />
+                  <button type="button" id="gateSubmit" class="play-gate-submit">Unlock</button>
+                </div>
+                <div id="gateError" class="play-gate-error hidden" role="alert">Incorrect password.</div>
+              </div>
+            </div>
+            <button type="button" class="inline-replay hidden" id="archiveRetry">Retry</button>
+          </div>
+          <p class="lobby-availability">Case availability varies with the public databases used by the game, including Wikipedia, FBI, Europol and UK NCA.</p>
+          <div id="readyHint" class="ready-hint" aria-live="polite"></div>
+        </div>
+      </div>
+      <div id="game" class="game hidden">
+        <aside class="source-panel" aria-label="Public source availability">
+          <h2 class="source-panel-title">The Record Desk</h2>
+          <p id="sourcePanelSubtitle" class="source-panel-subtitle">Live case index</p>
+          <div id="sourceList" class="source-list"></div><div id="sourcePanelFooter" class="source-panel-subtitle">No background sync yet.</div>
+        </aside>
+
+        <section class="visual-pane">
+          <div class="round-line">
+            <div class="round-info" aria-live="polite">
+              <span class="case-count"><strong id="caseCount">0</strong> possible cases</span>
+              <span class="round-divider">|</span>
+              <span>Round <strong id="roundLabel">1</strong></span>
+            </div>
+            <span id="poolStatus" class="pool-status" aria-hidden="true">Archive catalog</span>
+          </div>
+          <div class="record-meta">
+            <div class="record-meta-main">
+              <span class="record-label">Record subject</span>
+              <span class="person-name" id="personName">—</span>
+            </div>
+            <a id="recordSource" class="record-source" href="#" target="_blank" rel="noopener">Source</a>
+          </div>
+          <div class="photo-frame">
+            <img id="personImage" alt="Image associated with the public record" />
+            <a id="photoSourceTab" class="photo-source-tab" href="#" target="_blank" rel="noopener">Source</a>
+          </div>
+        </section>
+
+        <section class="play-pane">
+          <div class="question-block">
+            <h2 id="questionText" class="question">Which offense is identified in this public record?</h2>
+            <p class="notice">The image is identification context only. The answer is based on the linked public record, not on appearance.</p>
+          </div>
+
+          <div class="answers-wrap">
+            <div id="answers" class="answers hidden" aria-label="Answer choices"></div>
+            <div id="answersPlaceholder" class="answers-placeholder">Loading the case image before revealing the answer choices.</div>
+            <div id="status" class="status" aria-live="polite"></div>
+          </div>
+
+          <div id="caseOutcome" class="case-outcome hidden" aria-live="polite">
+            <div id="caseOutcomeTitle" class="case-outcome-title"></div>
+            <div id="caseOutcomeScore" class="case-outcome-score hidden"></div>
+            <p id="caseOutcomeCopy" class="case-outcome-copy"></p>
+            <p id="caseOutcomeDetail" class="case-outcome-detail"></p>
+            <button type="button" id="nextCase" class="inline-replay">Next case</button>
+          </div>
+
+          <div class="help-panel" aria-label="One-use helps">
+            <div class="help-title">One-use helps — reset every game</div>
+            <div class="helps">
+              <button type="button" class="help-btn" id="help5050" title="Remove two wrong answers"><span class="help-name">50 / 50</span><span class="help-desc">Remove 2 wrong choices.</span></button>
+              <button type="button" class="help-btn" id="helpClue" title="Reveal a clue from the public record"><span class="help-name">Case Note</span><span class="help-desc">Show a short factual clue.</span></button>
+              <button type="button" class="help-btn" id="helpAppeal" title="Your next wrong answer will be forgiven"><span class="help-name">Appeal</span><span class="help-desc">Forgive your next mistake.</span></button>
+            </div>
+            <div id="helpPrompt" class="help-prompt hidden" aria-live="polite">
+              <div id="helpPromptTitle" class="help-prompt-title"></div>
+              <p id="helpPromptCopy" class="help-prompt-copy"></p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Public-record game · <button type="button" class="footer-link legal-open" id="legalOpen">Legal & attribution</button></span>
+      <span class="footer-meta"><span>v2.6.0</span><span>by LeBeaas</span></span>
+    </footer>
+
+    <section id="legalPage" class="legal-page hidden" aria-hidden="true">
+      <div class="legal-sheet" role="dialog" aria-modal="true" aria-labelledby="legalTitle">
+        <div class="legal-head">
+          <div>
+            <div class="legal-kicker">CASE FILES · PUBLICATION NOTICE</div>
+            <h2 id="legalTitle">Legal &amp; Attribution</h2>
+          </div>
+          <button type="button" class="legal-close" id="legalClose" aria-label="Close legal page">Close</button>
+        </div>
+        <div class="legal-body">
+          <p><strong>Important:</strong> this page is an attribution and reuse guide, not legal advice. It cannot guarantee that every record, photograph, name, trademark, government-agency asset, or other third-party material is reusable in every jurisdiction. Before public redistribution, verify the source, license, attribution requirements, and any applicable publicity, privacy, trademark, defamation, or other laws for each asset you ship or mirror.</p>
+
+          <h3>Parody, entertainment and accuracy</h3>
+          <p><strong>Ben-What Blanc is a parody and entertainment game.</strong> It is not an official publication, law-enforcement service, news report, identification system, or endorsement of any person, agency, accusation, conviction, or source. The game is intended for playful, non-authoritative use.</p>
+          <p>The game developer/maintainer does not warrant that every fact is complete, current, correctly interpreted, or free from error. Public databases can contain outdated, disputed, incomplete, or incorrect information. <strong>The developer/maintainer is not responsible for false, inaccurate, outdated, or disputed information represented by the game, to the fullest extent permitted by applicable law.</strong> Do not use the game as a substitute for an official record or source document.</p>
+          <p>The game uses materials that are publicly accessible through the listed sources. <strong>Public accessibility does not by itself mean that every item is licensed for unrestricted redistribution.</strong> Individual photographs, logos, names, documents, and database records may have different terms. The publisher of a redistributed copy is responsible for checking the rights attached to each asset actually included in that copy.</p>
+
+          <h3>Data and source attribution</h3>
+          <p><a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a> structured data is released under <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>. Most Wikipedia text is available under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>; the specific page license and attribution requirements should be checked before reusing article text.</p>
+          <p><a href="https://commons.wikimedia.org/" target="_blank" rel="noopener">Wikimedia Commons</a> files have individual licenses. Credit the author, source, and license as required by the specific file, and follow any ShareAlike or other conditions.</p>
+          <p><a href="https://www.fbi.gov/wanted/api" target="_blank" rel="noopener">FBI Wanted API</a> provides the structured wanted-person feed used by the game. Do not imply FBI endorsement, and verify the current FBI site's reuse terms before redistributing local copies of its material.</p>
+          <p><a href="https://www.europol.europa.eu/legal-notice" target="_blank" rel="noopener">Europol</a> states that its website content is generally protected by copyright and that non-private reproduction may require permission; third-party images and documents may have separate rights. Treat Europol material as source-linked content and verify permission before bundling it into a published copy.</p>
+          <p><a href="https://www.nationalcrimeagency.gov.uk/terms-and-conditions" target="_blank" rel="noopener">UK National Crime Agency</a> states that its information may generally be reused under the Open Government Licence, while logos and many images/audio have separate restrictions. Do not redistribute NCA logos or third-party imagery without the required rights.</p>
+
+          <h3>Privacy, identification and accuracy</h3>
+          <p>This game presents names, photographs and public-record allegations or convictions for quiz purposes. It does not infer criminality from appearance. A wanted record is not the same thing as a conviction. Records may be incomplete, outdated, disputed, or wrong; users and publishers should verify the underlying source before relying on a record.</p>
+          <p>The game does not ask players to submit personal information. Browser caching is local to the player's device.</p>
+          <p><strong>Corrections and rights concerns:</strong> if a record appears inaccurate, outdated, or unlawfully reused, the repository maintainer can review the underlying source and asset. Any correction or removal request should identify the affected person or asset and, where possible, provide the original source URL and the reason for the request.</p>
+          <p><strong>No absolute legal guarantee:</strong> no disclaimer can eliminate every legal obligation or claim in every country. The safest publication practice is to distribute only assets whose licenses and terms you have verified and to keep clear attribution and source links.</p>
+
+          <h3>Game code</h3>
+          <p><strong>Ben-What Blanc v2.6.0</strong> · by LeBeaas. The repository owner should choose and publish a software license for the game code separately from the third-party data and media licenses above. The source datasets and images keep their own licenses and are not relicensed by this game.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+const APP_VERSION = "2.6.0";
+const WDQS = "https://query.wikidata.org/sparql";
+const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
+const FBI_WANTED_API = "https://api.fbi.gov/wanted/v1/list";
+const NO_CONVICTION = "No conviction recorded in this dataset";
+const REQUEST_TIMEOUT_MS = 12000;
+const FAST_REQUEST_TIMEOUT_MS = 3600;
+const BACKGROUND_REQUEST_TIMEOUT_MS = 9000;
+const IMAGE_TIMEOUT_MS = 8000;
+const INITIAL_PRELOAD = 12;
+const MIN_ACCEPTABLE_START_CASES = 20;
+const MIN_ACCEPTABLE_CATALOG_RECORDS = 100;
+const OPENING_PREP_TIMEOUT_MS = 45000;
+const OPENING_WAIT_TIMEOUT_MS = 120000;
+const INITIAL_CATALOG_TARGET = 520;
+const INITIAL_SEARCH_BATCHES = 10;
+const INITIAL_SEARCH_PAGE_SIZE = 80;
+const PRELOAD_EXTRA = 10;
+const MIN_CONVICTION_YEAR = 1940;
+const WD_ARCHIVE_PAGES = 18;
+const WD_PAGE_SIZE = 500;
+const BACKGROUND_REFRESH_AFTER_MS = 1000 * 60 * 60 * 6;
+const EUROPOL_DATASET_URL = "https://data.opensanctions.org/datasets/latest/eu_europol_wanted/targets.nested.json";
+const CATALOG_CACHE_KEY = "case-files-catalog-v17-live-bootstrap";
+const CATALOG_DB_NAME = "case-files-cache";
+const CATALOG_STORE_NAME = "catalog";
+const CATALOG_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 72;
+const CATALOG_CACHE_MAX_RECORDS = 8000;
+const SOURCE_DEFINITIONS = [
+  { key: "Wikidata", label: "Wikipedia / Wikidata", detail: "Convictions + biographies" },
+  { key: "FBI Wanted", label: "FBI Most Wanted", detail: "U.S. wanted records" },
+  { key: "Europol / EU Most Wanted", label: "Europol / EU Most Wanted", detail: "European fugitives" },
+  { key: "UK NCA Most Wanted", label: "UK NCA Most Wanted", detail: "UK fugitives" }
+];
+const sourceStats = Object.fromEntries(SOURCE_DEFINITIONS.map(source => [source.key, { status: "idle", count: 0, raw: 0 }]));
+const SOURCE_NAME_ALIASES = {
+  "Philippines Top Most Wanted Persons in the Cordillera Regions": "Philippines Top Most Wanted"
+};
+
+function sourceKeyForRecord(record) {
+  const direct = String(record?.sourceName || "").trim();
+  return SOURCE_NAME_ALIASES[direct] || direct;
+}
+
+function setSourceStatus(key, status, count = sourceStats[key]?.count || 0, raw = sourceStats[key]?.raw || 0) {
+  if (!sourceStats[key]) sourceStats[key] = { status: "idle", count: 0, raw: 0 };
+  sourceStats[key].status = status;
+  sourceStats[key].count = Number.isFinite(count) ? count : sourceStats[key].count || 0;
+  sourceStats[key].raw = Number.isFinite(raw) ? raw : sourceStats[key].raw || 0;
+  renderSourcePanel();
+}
+
+function rebuildSourceCounts(records, preserveStatuses = false) {
+  const old = new Map(Object.entries(sourceStats).map(([k, v]) => [k, { ...v }]));
+  for (const source of SOURCE_DEFINITIONS) {
+    const previous = old.get(source.key);
+    sourceStats[source.key] = preserveStatuses && previous
+      ? { ...previous, count: 0 }
+      : { status: "idle", count: 0, raw: 0 };
+  }
+  for (const record of records || []) {
+    const key = sourceKeyForRecord(record);
+    if (!sourceStats[key]) sourceStats[key] = { status: "idle", count: 0, raw: 0 };
+    sourceStats[key].raw += 1;
+    if (looksLikeUsablePersonPhoto(record)) sourceStats[key].count += 1;
+  }
+  for (const source of SOURCE_DEFINITIONS) {
+    if (sourceStats[source.key].count > 0 && sourceStats[source.key].status === "idle") sourceStats[source.key].status = "ready";
+  }
+  renderSourcePanel();
+}
+
+function renderSourcePanel() {
+  const el = $("sourceList");
+  if (!el) return;
+  el.innerHTML = "";
+  for (const source of SOURCE_DEFINITIONS) {
+    const stat = sourceStats[source.key] || { status: "idle", count: 0, raw: 0 };
+    const row = document.createElement("div");
+    row.className = `source-row ${stat.status}`;
+    const playableText = `${stat.count} playable`;
+    const rawText = stat.raw > stat.count ? ` · ${stat.raw.toLocaleString()} records seen` : "";
+    const statusText = stat.status === "ready" ? (stat.count ? "available" : "available · no playable images yet") : stat.status === "error" ? "unavailable" : stat.status === "idle" ? "not queried" : "resolving images…";
+    row.innerHTML = `<span class="source-dot" aria-hidden="true"></span><div><div class="source-name" title="${source.label.replace(/"/g, "&quot;")}">${source.label}</div><div class="source-meta"><span class="source-count">${playableText}</span>${rawText} · ${statusText}</div></div>`;
+    el.appendChild(row);
+  }
+  const footer = $("sourcePanelFooter");
+  if (footer) {
+    const ready = state.playableRecords?.length || 0;
+    const synced = state.lastSyncedAt ? new Date(state.lastSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "not yet";
+    footer.textContent = `${ready} playable cases in pool · last background sync ${synced}`;
+  }
+}
+
+function buildCriminalQuery(limit, offset = 0) {
+  return `
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT DISTINCT ?person ?personLabel ?personDescription ?birthDate ?deathDate ?crime ?crimeLabel ?crimeDescription ?convictionDate WHERE {
+  ?person wdt:P1399 ?crime.
+  OPTIONAL {
+    ?person wdt:P569 ?birthDate.
+  }
+  OPTIONAL {
+    ?person wdt:P570 ?deathDate.
+  }
+  OPTIONAL {
+    ?person p:P1399 ?convictionStatement.
+    ?convictionStatement ps:P1399 ?crime.
+    OPTIONAL { ?convictionStatement pq:P585 ?convictionDate. }
+  }
+  OPTIONAL {
+    ?person schema:description ?personDescription.
+    FILTER(LANG(?personDescription) = "en")
+  }
+  ?person rdfs:label ?personLabel.
+  ?crime rdfs:label ?crimeLabel.
+  OPTIONAL {
+    ?crime schema:description ?crimeDescription.
+    FILTER(LANG(?crimeDescription) = "en")
+  }
+  FILTER(LANG(?personLabel) = "en")
+  FILTER(LANG(?crimeLabel) = "en")
+  FILTER(?personLabel != "")
+  FILTER(?crimeLabel != "crime")
+  FILTER(!BOUND(?convictionDate) || YEAR(?convictionDate) >= ${MIN_CONVICTION_YEAR})
+}
+ORDER BY ?person
+LIMIT ${limit}
+OFFSET ${offset}
+`;
+}
+
+const CRIMINAL_QUERY = buildCriminalQuery(WD_PAGE_SIZE, 0);
+
+const CONTROL_QUERY = `
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT DISTINCT ?person ?personLabel ?personDescription ?image WHERE {
+  ?person wdt:P31 wd:Q5;
+          wdt:P18 ?image.
+  OPTIONAL {
+    ?person schema:description ?personDescription.
+    FILTER(LANG(?personDescription) = "en")
+  }
+  FILTER NOT EXISTS { ?person wdt:P1399 ?anyConviction. }
+  SERVICE wikibase:label {
+    bd:serviceParam wikibase:language "en".
+  }
+}
+LIMIT 120
+`;
+
+// Offline fallback records used only when live public sources are unavailable.
+const FALLBACK_RECORDS = [
+  { personId:"fallback-ramirez", person:"Richard Ramirez", description:"American serial killer (1960–2013).", crimeId:"fallback-murder-ramirez", crime:"murder", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Richard%20Ramirez%20with%20attorney.jpg?width=1000", source:"https://commons.wikimedia.org/wiki/File:Richard_Ramirez_with_attorney.jpg", kind:"conviction" },
+  { personId:"fallback-wuornos", person:"Aileen Wuornos", description:"American serial killer (1956–2002).", crimeId:"fallback-murder-wuornos", crime:"murder", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Wuornos.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Wuornos.jpg", kind:"conviction" },
+  { personId:"fallback-ridgway", person:"Gary Ridgway", description:"American serial killer (born 1949).", crimeId:"fallback-murder-ridgway", crime:"murder", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Gary%20Ridgway%20Mugshot%2011302001.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Gary_Ridgway_Mugshot_11302001.jpg", kind:"conviction" },
+  { personId:"fallback-madoff", person:"Bernard Madoff", description:"American fraudster and financier (1938–2021).", crimeId:"fallback-securities-fraud", crime:"securities fraud", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/BernardMadoff.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:BernardMadoff.jpg", kind:"conviction" },
+  { personId:"fallback-belfort", person:"Jordan Belfort", description:"American former stockbroker and convicted fraudster (born 1962).", crimeId:"fallback-fraud-money-laundering", crime:"securities fraud and money laundering", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/JordanBelfort2017.png?width=900", source:"https://commons.wikimedia.org/wiki/File:JordanBelfort2017.png", kind:"conviction" },
+  { personId:"fallback-pistorius", person:"Oscar Pistorius", description:"South African former sprinter convicted in the death of Reeva Steenkamp (born 1986).", crimeId:"fallback-murder-pistorius", crime:"murder", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Oscar%20Pistorius.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Oscar_Pistorius.jpg", kind:"conviction" },
+  { personId:"fallback-stewart", person:"Martha Stewart", description:"American businesswoman convicted in a federal obstruction and false-statements case (born 1941).", crimeId:"fallback-obstruction", crime:"conspiracy and obstruction of justice", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Martha%20Stewart.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Martha_Stewart.jpg", kind:"conviction" },
+  { personId:"fallback-tsarnaev", person:"Dzhokhar Tsarnaev", description:"American convicted bomber (born 1993).", crimeId:"fallback-terrorism", crime:"use of a weapon of mass destruction", image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/DzhokharTsarnaev.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:DzhokharTsarnaev.jpg", kind:"conviction" },
+  // Less celebrity-heavy control examples for offline fallback.
+  { personId:"control-stefan-hell", person:"Stefan Hell", description:"German-Romanian physicist and Nobel Prize recipient (born 1962).", crimeId:NO_CONVICTION, crime:NO_CONVICTION, image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Stefan_Hell_(2025).jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Stefan_Hell_(2025).jpg", kind:"no-conviction" },
+  { personId:"control-duncan-haldane", person:"Duncan Haldane", description:"British-American physicist and Nobel Prize recipient (born 1951).", crimeId:NO_CONVICTION, crime:NO_CONVICTION, image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Duncan_Haldane.jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Duncan_Haldane.jpg", kind:"no-conviction" },
+  { personId:"control-barry-barish", person:"Barry Barish", description:"American experimental physicist and Nobel Prize recipient (born 1936).", crimeId:NO_CONVICTION, crime:NO_CONVICTION, image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Barry_Barish_(28012957350).jpg?width=900", source:"https://commons.wikimedia.org/wiki/File:Barry_Barish_(28012957350).jpg", kind:"no-conviction" },
+  { personId:"control-katalin-kariko", person:"Katalin Karikó", description:"Hungarian-American biochemist and Nobel Prize recipient (born 1955).", crimeId:NO_CONVICTION, crime:NO_CONVICTION, image:"https://commons.wikimedia.org/wiki/Special:Redirect/file/Katalin_Kariko_light_corrected.jpeg?width=900", source:"https://commons.wikimedia.org/wiki/File:Katalin_Kariko_light_corrected.jpeg", kind:"no-conviction" }
+];
+
+const state = {
+  records: [],
+  playableRecords: [],
+  current: null,
+  score: 0,
+  answered: false,
+  used: { fifty: false, clue: false, appeal: false },
+  appealActive: false,
+  previousIds: new Set(),
+  mistakes: 0,
+  maxMistakes: 3,
+  round: 0,
+  failedIds: new Set(),
+  pendingEuropol: [],
+  isOpening: false,
+  initialPoolReady: false,
+  gameGeneration: 0,
+  backgroundSyncPromise: null,
+  lastSyncedAt: 0,
+  lobbyReady: false,
+  autoPlayAfterPrepare: false,
+  openingPromise: null,
+  lobbyClickWaiting: false,
+};
+
+const $ = (id) => document.getElementById(id);
+
+function shuffle(items) {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function imageUrlFromWikidata(uri) {
+  try {
+    const url = new URL(uri);
+    if (url.protocol === "http:") url.protocol = "https:";
+    return url.toString();
+  } catch {
+    return String(uri || "").replace(/^http:\/\//i, "https://");
+  }
+}
+
+function setLoading(title, copy, percent, progressText) {
+  // Background archive workers must never rewrite the player's lobby/loading UI.
+  // The visible waiting screen is intentionally static; preparation is silent.
+  return;
+}
+
+async function fetchJsonWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs || REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      mode: "cors",
+      headers: { Accept: "application/json", ...(options.headers || {}) },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Request failed with ${response.status}.`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchTextWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs || REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      mode: "cors",
+      headers: { Accept: "application/json,text/plain,*/*", ...(options.headers || {}) },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Request failed with ${response.status}.`);
+    return await response.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const ART_TERMS = [
+  "painting", "oil on canvas", "portrait painting", "watercolour", "watercolor",
+  "drawing", "sketch", "engraving", "etching", "lithograph", "woodcut", "illustration",
+  "caricature", "poster", "mural", "sculpture", "statue", "bust", "relief", "monument",
+  "icon", "fresco", "print", "artwork", "artistic depiction", "oil portrait"
+];
+const NON_PERSON_IMAGE_TERMS = [
+  "mitochond", "organelle", "chloroplast", "ribosome", "cell structure", "cell diagram",
+  "dna", "rna", "protein structure", "molecular structure", "chemical structure", "diagram",
+  "schematic", "flowchart", "graph", "chart", "plot", "map", "flag", "coat of arms", "logo",
+  "emblem", "building", "landscape", "cityscape", "bridge", "ship", "aircraft", "vehicle",
+  "anatomical", "anatomy", "micrograph", "microscope", "cross section", "sectional view",
+  "satellite image", "orbit", "constellation", "planet", "animal", "plant", "bacteria", "virus",
+  "skeleton", "weapon diagram", "floor plan", "technical drawing", "infographic"
+];
+
+function imageFilenameFromUrl(url) {
+  const value = String(url || "");
+  try {
+    const u = new URL(value);
+    const redirectMatch = u.pathname.match(/\/Special:Redirect\/file\/(.+)$/i);
+    const raw = redirectMatch ? decodeURIComponent(redirectMatch[1]) : decodeURIComponent(u.pathname.split("/").pop() || "");
+    return raw.replace(/^Special:Redirect\/file\//i, "").replace(/\.(?:jpe?g|png|webp|gif|svg|tiff?)$/i, "");
+  } catch (_) {
+    const redirect = value.match(/Special:Redirect\/file\/([^?]+)/i);
+    const raw = redirect ? redirect[1] : value.split("/").pop()?.split("?")[0] || "";
+    return decodeURIComponent(raw).replace(/\.(?:jpe?g|png|webp|gif|svg|tiff?)$/i, "");
+  }
+}
+
+function likelyPhotoText(record) {
+  return [record.imageFile || "", record.imageDescription || "", record.imageCategories || "", imageFilenameFromUrl(record.image || "")]
+    .join(" ").toLowerCase();
+}
+
+function looksLikePainting(record) {
+  const text = likelyPhotoText(record);
+  return ART_TERMS.some(term => text.includes(term));
+}
+
+function looksLikeNonPersonImage(record) {
+  const text = likelyPhotoText(record);
+  if (!text) return false;
+  if (/\.(?:svg|eps|ai)$/i.test(String(record.imageFile || "")) || /\.(?:svg|eps|ai)(?:\?|$)/i.test(String(record.image || ""))) return true;
+  return NON_PERSON_IMAGE_TERMS.some(term => text.includes(term));
+}
+
+function looksLikeUsablePersonPhoto(record) {
+  return Boolean(record?.image && !looksLikePainting(record) && !looksLikeNonPersonImage(record));
+}
+
+function neutralizeDescription(text) {
+  let value = String(text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  if (!value) return "Public-record subject.";
+  const bad = /(serial killer|killer|murderer|fraudster|terrorist|bomber|drug lord|gangster|criminal|crime boss|rapist|sex offender|convicted of|convicted in|convicted for|wanted for|wanted by|suspected of|accused of|alleged(?:ly)?|fugitive|offender|assassin|kidnapper)/ig;
+  value = value.replace(/\([^)]*(convict|murder|kill|fraud|terror|bomb|drug|crime|wanted|suspect|accus)[^)]*\)/ig, "");
+  value = value.replace(bad, "");
+  value = value.replace(/\s{2,}/g, " ").replace(/\s+([,.;])/g, "$1").replace(/[,;:]\s*(and|or)\s*[,;:.]?/ig, " ").trim();
+  value = value.replace(/^[-,:;.] +| +[-,:;.]$/g, "").replace(/\s{2,}/g, " ");
+  return value || "Public-record subject.";
+}
+
+function countryLabel(code) {
+  if (!code) return "";
+  try {
+    const normalized = String(code).trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(normalized)) {
+      const names = new Intl.DisplayNames(["en"], { type: "region" });
+      return names.of(normalized) || normalized;
+    }
+  } catch (_) {}
+  return String(code).trim();
+}
+
+function buildNeutralRecordDescription(record) {
+  if (record.neutralDescription) return record.neutralDescription;
+  const parts = [];
+  const nationality = record.nationalityLabel || countryLabel(record.nationality);
+  if (nationality) parts.push(`${nationality} national`);
+  if (record.gender) parts.push(String(record.gender).toLowerCase());
+  if (record.birthDate) {
+    const year = String(record.birthDate).slice(0, 4);
+    if (/^\d{4}$/.test(year)) parts.push(`born ${year}`);
+  }
+  const cleaned = neutralizeDescription(record.description);
+  if (cleaned !== "Public-record subject.") parts.push(cleaned);
+  record.neutralDescription = parts.join(" · ") || "Public-record subject.";
+  return record.neutralDescription;
+}
+
+function catalogSnapshot() {
+  return state.records.slice(0, CATALOG_CACHE_MAX_RECORDS).map(record => ({
+    personId: record.personId, person: record.person, description: record.description, neutralDescription: record.neutralDescription,
+    crimeId: record.crimeId, crime: record.crime, image: record.image, imageFile: record.imageFile,
+    imageDescription: record.imageDescription, imageCategories: record.imageCategories, source: record.source,
+    kind: record.kind, sourceName: record.sourceName, nationality: record.nationality,
+    nationalityLabel: record.nationalityLabel, gender: record.gender, birthDate: record.birthDate, birthYear: record.birthYear, deathDate: record.deathDate, deathYear: record.deathYear,
+    wikidataId: record.wikidataId, wikipediaUrl: record.wikipediaUrl, directImage: record.directImage,
+    crimeDescription: record.crimeDescription, convictionDate: record.convictionDate, offenseDetails: record.offenseDetails
+  }));
+}
+
+function openCatalogDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return resolve(null);
+    const request = indexedDB.open(CATALOG_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(CATALOG_STORE_NAME)) db.createObjectStore(CATALOG_STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveCatalogCache() {
+  const payload = { version: 16, savedAt: Date.now(), lastSyncedAt: state.lastSyncedAt || Date.now(), records: catalogSnapshot(), pendingEuropol: state.pendingEuropol || [] };
+  try { localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(payload)); } catch (error) { console.warn("Local cache could not be saved", error); }
+  try {
+    const db = await openCatalogDb();
+    if (!db) return;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(CATALOG_STORE_NAME, "readwrite");
+      tx.objectStore(CATALOG_STORE_NAME).put(payload, "main");
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn("IndexedDB cache could not be saved", error);
+  }
+}
+
+function decodeCatalogPayload(payload) {
+  if (!payload || payload.version !== 16 || !Array.isArray(payload.records) || !payload.records.length) return null;
+  if (Date.now() - Number(payload.savedAt || 0) > CATALOG_CACHE_MAX_AGE_MS) return null;
+  state.pendingEuropol = Array.isArray(payload.pendingEuropol) ? dedupePeopleAllowNoImage(payload.pendingEuropol, 500) : [];
+  state.lastSyncedAt = Number(payload.lastSyncedAt || 0) || Number(payload.savedAt || 0);
+  return dedupePeopleAllowNoImage(payload.records, CATALOG_CACHE_MAX_RECORDS);
+}
+
+async function loadCatalogCacheAsync() {
+  try {
+    const db = await openCatalogDb();
+    if (db) {
+      const payload = await new Promise((resolve, reject) => {
+        const tx = db.transaction(CATALOG_STORE_NAME, "readonly");
+        const request = tx.objectStore(CATALOG_STORE_NAME).get("main");
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      db.close();
+      const decoded = decodeCatalogPayload(payload);
+      if (decoded) return decoded;
+    }
+  } catch (error) {
+    console.warn("IndexedDB cache could not be read", error);
+  }
+  try {
+    const raw = localStorage.getItem(CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    return decodeCatalogPayload(JSON.parse(raw));
+  } catch (error) {
+    console.warn("Local catalog cache could not be read", error);
+    return null;
+  }
+}
+
+async function queryWikidata(query, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const url = `${WDQS}?query=${encodeURIComponent(query)}&format=json&origin=*`;
+  return fetchJsonWithTimeout(url, { timeoutMs });
+}
+
+function canonicalPersonKey(record) {
+  if (record.wikidataId) return `wd:${record.wikidataId}`;
+  const name = String(record.person || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return name ? `name:${name}` : String(record.personId || "");
+}
+
+function dedupePeople(records) {
+  const map = new Map();
+  for (const record of records) {
+    if (!record.personId || !record.person || !record.image) continue;
+    const key = canonicalPersonKey(record);
+    if (!map.has(key)) map.set(key, record);
+  }
+  return [...map.values()];
+}
+
+function mapCriminalRows(json) {
+  const rows = (json?.results?.bindings || []).map(row => {
+    const birthDate = row.birthDate?.value || "";
+    const deathDate = row.deathDate?.value || "";
+    return {
+      personId: row.person?.value,
+      wikidataId: (row.person?.value || "").split("/").pop(),
+      person: row.personLabel?.value,
+      description: row.personDescription?.value || "No short description is available in the public record.",
+      crimeId: row.crime?.value,
+      crime: normalizeOffenseLabel(row.crimeLabel?.value),
+      crimeDescription: row.crimeDescription?.value || "",
+      convictionDate: row.convictionDate?.value || "",
+      birthDate,
+      birthYear: yearFromWikidataTime(birthDate),
+      deathDate,
+      deathYear: yearFromWikidataTime(deathDate),
+      image: "",
+      imageFile: "",
+      source: row.person?.value,
+      sourceName: "Wikidata",
+      wikipediaUrl: "",
+      kind: "conviction"
+    };
+  }).filter(r => r.personId && r.person && r.crime && isDisplayEligible(r));
+  return dedupePeopleAllowNoImage(rows, 5000);
+}
+
+function mapControlRows(json) {
+  const rows = (json?.results?.bindings || []).map(row => ({
+    personId: row.person?.value,
+    person: row.personLabel?.value,
+    description: row.personDescription?.value || "No short description is available in the public record.",
+    crimeId: NO_CONVICTION,
+    crime: NO_CONVICTION,
+    image: imageUrlFromWikidata(row.image?.value),
+    imageFile: row.image?.value,
+    source: row.person?.value,
+    sourceName: "Wikidata",
+    kind: "no-conviction"
+  })).filter(r => r.personId && r.person && r.image);
+  return dedupePeople(rows);
+}
+
+async function fetchWikidataApi(params) {
+  const query = new URLSearchParams({ ...params, format: "json", origin: "*" });
+  return fetchJsonWithTimeout(`${WIKIDATA_API}?${query.toString()}`);
+}
+
+async function searchWikidataIds(search, limit = 50, offset = 0) {
+  const json = await fetchWikidataApi({
+    action: "query",
+    list: "search",
+    srsearch: search,
+    srnamespace: "0",
+    srlimit: String(limit),
+    sroffset: String(offset),
+  });
+  return (json?.query?.search || []).map(row => row.title).filter(id => /^Q\d+$/.test(id));
+}
+
+async function getWikidataEntities(ids) {
+  const uniqueIds = [...new Set(ids)].filter(Boolean);
+  const chunks = [];
+  for (let i = 0; i < uniqueIds.length; i += 50) chunks.push(uniqueIds.slice(i, i + 50));
+  const responses = await Promise.all(chunks.map(chunk => fetchWikidataApi({
+    action: "wbgetentities",
+    ids: chunk.join("|"),
+    props: "labels|descriptions|claims|sitelinks",
+    languages: "en",
+    languagefallback: "1"
+  })));
+  const entities = {};
+  for (const response of responses) Object.assign(entities, response?.entities || {});
+  return entities;
+}
+
+function wikipediaUrlFromEntity(entity) {
+  const title = entity?.sitelinks?.enwiki?.title;
+  return title ? `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}` : "";
+}
+
+function claimIdValues(entity, property) {
+  return (entity?.claims?.[property] || [])
+    .map(statement => statement?.mainsnak?.datavalue?.value)
+    .map(value => typeof value === "string" ? value : value?.id)
+    .filter(Boolean);
+}
+
+function claimStringValues(entity, property) {
+  return (entity?.claims?.[property] || [])
+    .map(statement => statement?.mainsnak?.datavalue?.value)
+    .filter(value => typeof value === "string" && value.trim());
+}
+
+function claimTimeValues(entity, property) {
+  return (entity?.claims?.[property] || [])
+    .map(statement => statement?.mainsnak?.datavalue?.value?.time)
+    .filter(value => typeof value === "string" && value);
+}
+
+function yearFromWikidataTime(value) {
+  const match = String(value || "").match(/^[+-](\d{4})/);
+  return match ? Number(match[1]) : null;
+}
+
+function recordBirthYear(record) {
+  if (Number.isFinite(record?.birthYear)) return record.birthYear;
+  return yearFromWikidataTime(record?.birthDate) || (typeof record?.birthDate === "string" && /^\d{4}/.test(record.birthDate) ? Number(record.birthDate.slice(0,4)) : null);
+}
+
+function recordDeathYear(record) {
+  if (Number.isFinite(record?.deathYear)) return record.deathYear;
+  return yearFromWikidataTime(record?.deathDate) || (typeof record?.deathDate === "string" && /^\d{4}/.test(record.deathDate) ? Number(record.deathDate.slice(0,4)) : null);
+}
+
+function isBornBefore1900(record) {
+  const year = recordBirthYear(record);
+  return Number.isFinite(year) && year < 1900;
+}
+
+function isDeadBefore1900(record) {
+  const year = recordDeathYear(record);
+  return Number.isFinite(year) && year < 1900;
+}
+
+function isDisplayEligible(record) {
+  return Boolean(record?.personId && record?.person && !isBornBefore1900(record) && !isDeadBefore1900(record));
+}
+
+function entityHasEligibleConviction(entity) {
+  const years = (entity?.claims?.P1399 || [])
+    .map(statement => {
+      const time = statement?.qualifiers?.P585?.[0]?.datavalue?.value?.time;
+      const match = time && String(time).match(/^[+-](\d{4})/);
+      return match ? Number(match[1]) : null;
+    })
+    .filter(year => Number.isFinite(year));
+  return years.length === 0 || years.some(year => year >= MIN_CONVICTION_YEAR);
+}
+
+async function inspectCommonsImage(record) {
+  if (!record.imageFile) return record;
+  try {
+    const title = `File:${record.imageFile.replace(/^File:/i, "")}`;
+    const params = new URLSearchParams({ action: "query", format: "json", origin: "*", prop: "imageinfo", iiprop: "extmetadata", titles: title });
+    const json = await fetchJsonWithTimeout(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, { timeoutMs: 5000 });
+    const page = Object.values(json?.query?.pages || {})[0];
+    const meta = page?.imageinfo?.[0]?.extmetadata || {};
+    const description = meta.ImageDescription?.value || "";
+    const categories = meta.Categories?.value || "";
+    record.imageDescription = String(description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    record.imageCategories = String(categories).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  } catch (_) {}
+  return record;
+}
+
+function firstHttpUrl(values) {
+  for (const value of Array.isArray(values) ? values : [values]) {
+    if (typeof value !== "string") continue;
+    const url = value.trim();
+    if (/^https?:\/\//i.test(url) && (/\.(?:jpe?g|png|webp)(?:\?|$)/i.test(url) || /(?:image|photo|portrait|picture|media)/i.test(url))) return url;
+  }
+  return "";
+}
+
+function findDirectImage(props) {
+  const directKeys = ["image", "images", "photo", "photos", "picture", "pictures", "portrait", "portraits", "imageUrl", "imageUrls"];
+  for (const key of directKeys) {
+    const found = firstHttpUrl(props?.[key]);
+    if (found) return found;
+  }
+  for (const value of Object.values(props || {})) {
+    if (Array.isArray(value)) {
+      const found = firstHttpUrl(value);
+      if (found) return found;
+      for (const item of value) {
+        if (item && typeof item === "object") {
+          const nested = findDirectImage(item);
+          if (nested) return nested;
+        }
+      }
+    } else if (value && typeof value === "object") {
+      const nested = findDirectImage(value);
+      if (nested) return nested;
+    }
+  }
+  return "";
+}
+
+function recordRoleDescription(props = {}) {
+  const nationality = countryLabel(props.nationality?.[0] || props.birthCountry?.[0] || props.country?.[0]);
+  const profession = props.profession?.[0] || props.position?.[0] || "";
+  const birthDate = props.birthDate?.[0] || "";
+  const year = /^\d{4}/.test(birthDate) ? birthDate.slice(0,4) : "";
+  return [nationality && `${nationality} national`, profession, year && `born ${year}`].filter(Boolean).join(" · ") || "Public-record subject.";
+}
+
+function cleanOffenseDetails(values = []) {
+  const parts = (Array.isArray(values) ? values : [values])
+    .map(v => String(v || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter(v => !/^(wanted|wanted for|arrest warrant|convicted|sentenced)$/i.test(v));
+  const detail = parts.find(v => v.length > 30) || parts[0] || "The public source provides limited offense detail.";
+  return detail.length > 240 ? `${detail.slice(0, 237).replace(/[ ,;:-]+$/, "")}…` : detail;
+}
+
+function buildWantedRecord({ id, caption, props, sourceName = "Europol / EU Most Wanted", kind = "wanted" }) {
+  const notes = [
+    ...(Array.isArray(props.notes) ? props.notes : []),
+    ...(Array.isArray(props.summary) ? props.summary : []),
+    ...(Array.isArray(props.description) ? props.description : []),
+    ...(Array.isArray(props.reason) ? props.reason : [])
+  ];
+  const crime = normalizeOffenseLabel(openSanctionsOffense(notes));
+  const directImage = findDirectImage(props);
+  const sourceUrl = props.sourceUrl?.[0] || (sourceName.includes("Europol") ? "https://eumostwanted.eu/" : "");
+  const wikidataId = props.wikidataId?.[0] || "";
+  const wikipediaUrl = props.wikipediaUrl?.[0] || props.wikipedia?.[0] || "";
+  return {
+    personId: `${sourceName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${id}`,
+    person: caption || props.name?.[0],
+    description: recordRoleDescription(props),
+    neutralDescription: recordRoleDescription(props),
+    offenseDetails: cleanOffenseDetails(notes),
+    crimeId: `wanted-${crime.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 80)}`,
+    crime, image: directImage ? imageUrlFromWikidata(directImage) : "", imageFile: "", directImage: Boolean(directImage),
+    source: sourceUrl, sourceName, kind, wikidataId, wikipediaUrl,
+    nationality: props.nationality?.[0] || props.birthCountry?.[0] || props.country?.[0] || "",
+    gender: props.gender?.[0] || "",
+    birthDate: props.birthDate?.[0] || "",
+    birthYear: /^\d{4}/.test(props.birthDate?.[0] || "") ? Number(String(props.birthDate[0]).slice(0,4)) : null,
+    deathDate: props.deathDate?.[0] || props.dateOfDeath?.[0] || "",
+    deathYear: /^(?:\d{4})/.test(props.deathDate?.[0] || props.dateOfDeath?.[0] || "") ? Number(String(props.deathDate?.[0] || props.dateOfDeath?.[0]).slice(0,4)) : null
+  };
+}
+
+async function loadEuropolCatalog() {
+  const text = await fetchTextWithTimeout(EUROPOL_DATASET_URL, { timeoutMs: 7000 });
+  const rows = parseNdjson(text);
+  const records = rows
+    .filter(row => row?.schema === "Person" && row?.properties?.topics?.some(t => /wanted|crime/i.test(String(t))))
+    .map(row => buildWantedRecord({ id: row.id, caption: row.caption, props: row.properties || {} }));
+  return dedupePeopleAllowNoImage(records, 120);
+}
+
+async function resolveEuropolImages(records, maxCount = 8) {
+  const candidates = shuffle(records).slice(0, Math.min(maxCount, records.length));
+  return resolveImagesForRecords(candidates, 4);
+}
+
+async function loadRecordsViaWikidataSearch(criminalLimit = 80, criminalOffset = 0, controlLimit = 8) {
+  const criminalPages = await Promise.all([
+    searchWikidataIds("haswbstatement:P31=Q5 haswbstatement:P1399", criminalLimit, criminalOffset)
+  ]);
+  const controlPage = await searchWikidataIds("haswbstatement:P31=Q5 -haswbstatement:P1399", controlLimit, 0);
+
+  const criminalIds = [...new Set(criminalPages.flat())];
+  const controlIds = [...new Set(controlPage)];
+  const personIds = [...new Set([...criminalIds, ...controlIds])];
+
+  const peopleEntities = await getWikidataEntities(personIds);
+  const crimeIds = [];
+  for (const personId of criminalIds) crimeIds.push(...claimIdValues(peopleEntities[personId], "P1399"));
+  const crimeEntities = await getWikidataEntities(crimeIds);
+
+  const criminals = criminalIds.map(personId => {
+    const person = peopleEntities[personId];
+    const crimeId = claimIdValues(person, "P1399")[0];
+    const crime = crimeEntities[crimeId];
+    const label = person?.labels?.en?.value;
+    const description = person?.descriptions?.en?.value;
+    const crimeLabel = crime?.labels?.en?.value;
+    const birthDate = claimTimeValues(person, "P569")[0] || "";
+    const birthYear = yearFromWikidataTime(birthDate);
+    const p18 = claimStringValues(person, "P18")[0] || "";
+    const deathDate = claimTimeValues(person, "P570")[0] || "";
+    const deathYear = yearFromWikidataTime(deathDate);
+    if (!label || !crimeLabel || !entityHasEligibleConviction(person) || (Number.isFinite(birthYear) && birthYear < 1900) || (Number.isFinite(deathYear) && deathYear < 1900)) return null;
+    return {
+      personId,
+      wikidataId: personId.split("/").pop(),
+      person: label,
+      description: description || "No short description is available in the public record.",
+      crimeId,
+      crime: normalizeOffenseLabel(crimeLabel),
+      crimeDescription: crime?.descriptions?.en?.value || "",
+      birthDate,
+      birthYear,
+      deathDate,
+      deathYear,
+      image: p18 ? `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(p18)}?width=1000` : "",
+      imageFile: p18,
+      source: `https://www.wikidata.org/wiki/${personId.split("/").pop()}`,
+      sourceName: "Wikidata",
+      wikipediaUrl: wikipediaUrlFromEntity(person),
+      kind: "conviction"
+    };
+  }).filter(Boolean);
+
+  const controls = controlIds.map(personId => {
+    const person = peopleEntities[personId];
+    const label = person?.labels?.en?.value;
+    const description = person?.descriptions?.en?.value;
+    const image = claimStringValues(person, "P18")[0] || "";
+    const birthDate = claimTimeValues(person, "P569")[0] || "";
+    const birthYear = yearFromWikidataTime(birthDate);
+    const deathDate = claimTimeValues(person, "P570")[0] || "";
+    const deathYear = yearFromWikidataTime(deathDate);
+    if (!label || !image || (Number.isFinite(birthYear) && birthYear < 1900) || (Number.isFinite(deathYear) && deathYear < 1900)) return null;
+    return {
+      personId,
+      wikidataId: personId.split("/").pop(),
+      person: label,
+      description: description || "No short description is available in the public record.",
+      crimeId: NO_CONVICTION,
+      crime: NO_CONVICTION,
+      birthDate,
+      birthYear,
+      image: `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(image)}?width=900`,
+      imageFile: image,
+      source: `https://www.wikidata.org/wiki/${personId.split("/").pop()}`,
+      sourceName: "Wikidata",
+      wikipediaUrl: wikipediaUrlFromEntity(person),
+      kind: "no-conviction"
+    };
+  }).filter(Boolean);
+
+  return { criminals: dedupePeopleAllowNoImage(criminals, 5000), controls: dedupePeople(controls) };
+}
+
+async function loadFbiWantedRecords(options = {}) {
+  const generation = options.generation ?? state.gameGeneration;
+  if (generation !== state.gameGeneration) return [];
+  setSourceStatus("FBI Wanted", "loading", sourceStats["FBI Wanted"]?.count || 0);
+  try {
+    const timeoutMs = options.timeoutMs || 6000;
+    const pageSize = Number(options.pageSize || 50);
+    const firstParams = new URLSearchParams({ page: "1", pageSize: String(pageSize) });
+    const first = await fetchJsonWithTimeout(`${FBI_WANTED_API}?${firstParams.toString()}`, { timeoutMs });
+    const total = Number(first?.total || 0);
+    const pageCount = Math.min(Math.max(1, Math.ceil(total / pageSize)), Number(options.maxPages || 24));
+    const pages = Array.from({ length: pageCount - 1 }, (_, i) => i + 2);
+    const pageResults = await Promise.allSettled(pages.map(page => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      return fetchJsonWithTimeout(`${FBI_WANTED_API}?${params.toString()}`, { timeoutMs });
+    }));
+    const items = [first, ...pageResults.filter(r => r.status === "fulfilled").map(r => r.value)].flatMap(data => data?.items || []);
+    const offenseWords = [
+      ["murder", "murder"], ["homicide", "murder / homicide"], ["kidnapping", "kidnapping"], ["robbery", "robbery"],
+      ["fraud", "fraud"], ["arson", "arson"], ["extortion", "extortion"], ["racketeering", "racketeering"],
+      ["money laundering", "money laundering"], ["drug trafficking", "drug trafficking"], ["narcotics", "drug trafficking"],
+      ["terrorism", "terrorism"], ["weapons", "weapons offense"], ["firearm", "weapons offense"],
+      ["assault", "assault"], ["sexual assault", "sexual assault"], ["rape", "sexual assault"],
+      ["embezzlement", "embezzlement"], ["conspiracy", "conspiracy"], ["bribery", "bribery / corruption"],
+      ["wire fraud", "wire fraud"], ["identity theft", "identity theft"], ["computer", "computer crime"],
+      ["cyber", "cybercrime"], ["smuggling", "smuggling"], ["child exploitation", "child sexual exploitation"],
+      ["trafficking", "human trafficking"]
+    ];
+    const result = [];
+    const seen = new Set();
+    for (const item of shuffle(items)) {
+      const image = item?.images?.[0]?.original || item?.images?.[0]?.large || item?.images?.[0]?.thumb;
+      const person = item?.title?.trim();
+      if (!image || !person || !item?.uid || seen.has(item.uid)) continue;
+      const text = [item.description, item.caution, item.subjects?.join(" "), item.remarks, item.additional_information, item.poster, item.dates_of_birth?.join(" "), item.dates_of_death?.join(" "), item.date_of_death, item.death_date].filter(Boolean).join(" ");
+      const lower = text.toLowerCase();
+      const match = offenseWords.find(([needle]) => lower.includes(needle));
+      if (!match) continue;
+      const birthYearMatch = text.match(/\b(?:born|birth date|date of birth)[:\s-]*(?:[A-Za-z]+\s+)?(18\d{2}|19\d{2}|20\d{2})\b/i);
+      const deathYearMatch = text.match(/\b(?:died|death date|date of death|deceased)[:\s-]*(?:[A-Za-z]+\s+)?(18\d{2}|19\d{2}|20\d{2})\b/i);
+      const birthYear = birthYearMatch ? Number(birthYearMatch[1]) : null;
+      const deathYear = deathYearMatch ? Number(deathYearMatch[1]) : null;
+      if ((Number.isFinite(birthYear) && birthYear < 1900) || (Number.isFinite(deathYear) && deathYear < 1900)) continue;
+      seen.add(item.uid);
+      result.push({
+        personId: `fbi-${item.uid}`,
+        person,
+        description: "FBI wanted-record subject.",
+        neutralDescription: "FBI wanted-record subject.",
+        offenseDetails: cleanOffenseDetails([item.description, item.caution, item.subjects?.join(" "), item.additional_information]),
+        crimeId: `fbi-offense-${match[1]}`,
+        crime: normalizeOffenseLabel(match[1]),
+        image: imageUrlFromWikidata(image),
+        source: item.url || "https://www.fbi.gov/wanted",
+        kind: "wanted",
+        sourceName: "FBI Wanted",
+        birthYear,
+        deathYear
+      });
+      if (result.length >= Number(options.maxPlayable || 260)) break;
+    }
+    if (generation !== state.gameGeneration) return [];
+    setSourceStatus("FBI Wanted", "ready", result.length, items.length);
+    return result;
+  } catch (error) {
+    if (generation === state.gameGeneration) setSourceStatus("FBI Wanted", "error", sourceStats["FBI Wanted"]?.count || 0, sourceStats["FBI Wanted"]?.raw || 0);
+    console.warn("FBI Wanted API unavailable", error);
+    return [];
+  }
+}
+
+function parseNdjson(text) {
+  return String(text || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).filter(Boolean);
+}
+
+function normalizeOffenseLabel(value) {
+  let text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "serious criminal offense";
+  const maps = [
+    [/\bmurder\b|\bhomicide\b/i, "murder / homicide"],
+    [/\bkidnapping\b|\babduction\b/i, "kidnapping"],
+    [/\brobbery\b|\barmed robbery\b/i, "robbery"],
+    [/\btheft\b|\blarceny\b|\bburglary\b/i, "theft / burglary"],
+    [/\bfraud\b|\bwire fraud\b/i, "fraud"],
+    [/\bmoney laundering\b/i, "money laundering"],
+    [/\bdrug trafficking\b|\bnarcotics trafficking\b/i, "drug trafficking"],
+    [/\bweapons? offense\b|\bfirearms? offense\b|\barms trafficking\b/i, "weapons offense"],
+    [/\barson\b/i, "arson"], [/\bextortion\b/i, "extortion"],
+    [/\brape\b|\bsexual assault\b/i, "sexual assault"], [/\bassault\b/i, "assault"],
+    [/\bbribery\b|\bcorruption\b/i, "bribery / corruption"], [/\bconspiracy\b/i, "conspiracy"],
+    [/\bsmuggling\b/i, "smuggling"], [/\bracketeering\b/i, "racketeering"],
+    [/\bembezzlement\b/i, "embezzlement"], [/\bcybercrime\b|\bcomputer crime\b/i, "cybercrime"],
+    [/\bterrorism\b/i, "terrorism"],
+    [/\brapina\b|\brapine\b/i, "robbery"], [/\bomicidio\b|\bomicidi\b/i, "murder / homicide"],
+    [/\bsequestro di persona\b|\bsequestro\b/i, "kidnapping"], [/\bfrode\b|\btruffa\b|\btruffe\b/i, "fraud"],
+    [/\briciclaggio\b/i, "money laundering"], [/\btraffico di droga\b|\bnarcotraffico\b|\bstupefacenti\b/i, "drug trafficking"],
+    [/\barmi\b|\bmunizioni\b|\besplosivi\b/i, "weapons offense"], [/\bincendio\b|\bincendi\b/i, "arson"],
+    [/\bestorsione\b|\bestorsioni\b/i, "extortion"], [/\bviolenza sessuale\b|\bstupro\b|\bstupri\b/i, "sexual assault"],
+    [/\baggressione\b|\bpercosse\b/i, "assault"], [/\bcorruzione\b/i, "bribery / corruption"],
+    [/\bcospirazione\b|\bassociazione per delinquere\b/i, "conspiracy / organized crime"], [/\bcontrabbando\b/i, "smuggling"],
+    [/\bfurto\b|\bfurti\b/i, "theft / burglary"],
+    [/\brobo\b|\brobos\b|\brobo con violencia\b|\brobo con intimidaci[oó]n\b/i, "robbery"],
+    [/\bhomicidio\b|\bhomicidios\b/i, "murder / homicide"], [/\basesinato\b|\basesinatos\b/i, "murder"],
+    [/\bsecuestro\b|\bsecuestros\b/i, "kidnapping"], [/\bestafa\b|\bestafas\b|\bfraude\b/i, "fraud"],
+    [/\bblanqueo de capitales\b/i, "money laundering"], [/\btr[aá]fico de drogas\b/i, "drug trafficking"],
+    [/\btenencia.*armas\b|\btr[aá]fico.*armas\b|\bmuniciones\b|\bexplosivos\b/i, "weapons offense"],
+    [/\bextorsi[oó]n\b/i, "extortion"], [/\bviolaci[oó]n\b|\bagresi[oó]n sexual\b/i, "sexual assault"],
+    [/\bcohecho\b|\bcorrupci[oó]n\b/i, "bribery / corruption"], [/\bconspiraci[oó]n\b/i, "conspiracy"],
+    [/\bcontrabando\b/i, "smuggling"], [/\bhurto\b|\bhurtos\b/i, "theft / burglary"],
+    [/\bMord\b|\bT[oö]tung\b/i, "murder / homicide"], [/\bRaub\b|\bDiebstahl\b|\bEinbruch\b/i, "robbery / theft"],
+    [/\bBetrug\b/i, "fraud"], [/\bGeldw[aä]sche\b/i, "money laundering"], [/\bDrogenhandel\b|\bDrogenschmuggel\b/i, "drug trafficking"],
+    [/\bWaffen\b|\bWaffenschmuggel\b/i, "weapons offense"], [/\bBrandstiftung\b/i, "arson"], [/\bEntführung\b/i, "kidnapping"],
+    [/\bmeurtre\b|\bhomicide\b/i, "murder / homicide"], [/\bvol à main armée\b|\bvol avec violence\b|\braquage\b/i, "robbery"],
+    [/\bvol\b|\bcambriolage\b/i, "theft / burglary"], [/\bescroquerie\b/i, "fraud"], [/\bblanchiment\b/i, "money laundering"],
+    [/\btrafic de drogue\b/i, "drug trafficking"], [/\benl[eè]vement\b/i, "kidnapping"],
+    [/\bmoord\b|\bdoodslag\b/i, "murder / homicide"], [/\boverval\b|\broof\b/i, "robbery"], [/\bdiefstal\b|\binbraak\b/i, "theft / burglary"],
+    [/\bfraude\b/i, "fraud"], [/\bwitwassen\b/i, "money laundering"], [/\bdrugshandel\b/i, "drug trafficking"],
+    [/\bwapens?\b|\bwapenhandel\b/i, "weapons offense"], [/\bbrandstichting\b/i, "arson"], [/\bontvoering\b/i, "kidnapping"],
+    [/\bkradzież\b|\brozbój\b/i, "theft / robbery"], [/\bpranie pieniędzy\b/i, "money laundering"]
+  ];
+  for (const [pattern, replacement] of maps) if (pattern.test(text)) return replacement;
+  const foreignMarkers = /\b(?:delito|delitos|buscado|buscada|peligrosidad|condena|condenado|condenada|tenencia|tr[aá]fico|omicidio|rapina|furto|reato|reati|delitto|delitti|sequestro|riciclaggio|armi|munizioni|esplosivi|mord|t[oö]tung|raub|diebstahl|betrug|geldw[aä]sche|drogenhandel|waffen|brandstiftung|entf[uü]hrung|meurtre|vol avec violence|blanchiment|enl[eè]vement|moord|overval|diefstal|witwassen|ontvoering|kradzież|rozbój|pranie pieniędzy)\b/i.test(text);
+  const longForeignish = text.length > 80 && /[àèìòùáéíóúñçäöüßąćęłńśźżșțğ]/i.test(text);
+  if (foreignMarkers || longForeignish || text.length > 72) return "serious criminal offense";
+  return text;
+}
+function openSanctionsOffense(notes = []) {
+  const substantive = notes
+    .map(value => String(value || "").trim())
+    .filter(Boolean)
+    .filter(value => !/^(ongoing investigation|draft|failed to attend court)$/i.test(value))
+    .filter(value => !/^(sentenced|convicted|wanted|arrest warrant)/i.test(value));
+  return normalizeOffenseLabel(substantive.slice(0, 2).join("; ")) || "serious criminal offense";
+}
+
+const OPENSANCTIONS_SOURCES = [
+  { name: "Europol / EU Most Wanted", dataset: "eu_europol_wanted", sourceUrl: "https://eumostwanted.eu/" },
+  { name: "UK NCA Most Wanted", dataset: "gb_nca_most_wanted", sourceUrl: "https://www.nationalcrimeagency.gov.uk/most-wanted" }
+];
+
+async function loadOpenSanctionsSource(source) {
+  const url = `https://data.opensanctions.org/datasets/latest/${encodeURIComponent(source.dataset)}/targets.nested.json`;
+  const text = await fetchTextWithTimeout(url, { timeoutMs: BACKGROUND_REQUEST_TIMEOUT_MS });
+  return parseNdjson(text);
+}
+
+async function loadOpenSanctionsSources(generation = state.gameGeneration) {
+  const all = [];
+  const jobs = OPENSANCTIONS_SOURCES.map(async source => {
+    const displayKey = SOURCE_NAME_ALIASES[source.name] || source.name;
+    setSourceStatus(displayKey, "loading", sourceStats[displayKey]?.count || 0, sourceStats[displayKey]?.raw || 0);
+    try {
+      if (generation !== state.gameGeneration) return [];
+      const rows = await loadOpenSanctionsSource(source);
+      const personRows = rows.filter(row => row?.schema === "Person");
+      setSourceStatus(displayKey, "loading", sourceStats[displayKey]?.count || 0, personRows.length);
+      const rawRecords = [];
+      for (const row of shuffle(personRows).slice(0, 1800)) {
+        const props = row?.properties || {};
+        const topics = Array.isArray(props.topics) ? props.topics : [];
+        if (topics.length && !topics.some(t => /wanted|crime|red_notice|fugitive|offence|offense/i.test(String(t)))) continue;
+        const record = buildWantedRecord({ id: row.id, caption: row.caption, props, sourceName: source.name });
+        record.source = props.sourceUrl?.[0] || source.sourceUrl;
+        if (isDisplayEligible(record)) rawRecords.push(record);
+      }
+      const playable = await resolveImagesForRecords(rawRecords.slice(0, 320), 16);
+      if (generation !== state.gameGeneration) return [];
+      if (playable.length) {
+        all.push(...playable);
+        mergeBackgroundRecords(playable, generation);
+      }
+      setSourceStatus(displayKey, "ready", state.records.filter(r => sourceKeyForRecord(r) === displayKey).length, personRows.length);
+      return playable;
+    } catch (error) {
+      setSourceStatus(displayKey, "error", state.records.filter(r => sourceKeyForRecord(r) === displayKey).length, sourceStats[displayKey]?.raw || 0);
+      console.warn(`${source.name} unavailable`, error);
+      return [];
+    }
+  });
+  await Promise.allSettled(jobs);
+  return dedupePeople(all);
+}
+
+function dedupePeopleAllowNoImage(records, cap = Infinity) {
+  const map = new Map();
+  for (const record of records) {
+    if (!record.personId || !record.person) continue;
+    if (!map.has(record.personId)) map.set(record.personId, record);
+    if (map.size >= cap) break;
+  }
+  return [...map.values()];
+}
+
+
+function wikipediaPageInfoFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const hostMatch = parsed.hostname.match(/^([a-z-]+)\.wikipedia\.org$/i);
+    if (!hostMatch) return null;
+    const lang = hostMatch[1].toLowerCase();
+    const marker = "/wiki/";
+    const index = parsed.pathname.indexOf(marker);
+    if (index < 0) return null;
+    const title = decodeURIComponent(parsed.pathname.slice(index + marker.length)).replace(/_/g, " ").trim();
+    if (!title || title.includes(":")) return null;
+    return { lang, title };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getWikipediaPageImage(url) {
+  const page = wikipediaPageInfoFromUrl(url);
+  if (!page) return null;
+  try {
+    const params = new URLSearchParams({
+      action: "query",
+      format: "json",
+      origin: "*",
+      prop: "pageimages|pageterms",
+      piprop: "original|thumbnail",
+      pilicense: "free",
+      pithumbsize: "1200",
+      titles: page.title,
+      redirects: "1"
+    });
+    const json = await fetchJsonWithTimeout(`https://${page.lang}.wikipedia.org/w/api.php?${params.toString()}`, { timeoutMs: 6500 });
+    const pageData = Object.values(json?.query?.pages || {})[0];
+    const image = pageData?.original?.source || pageData?.thumbnail?.source || "";
+    if (!image) return null;
+    const out = { image: imageUrlFromWikidata(image), description: pageData?.pageterms?.description?.[0] || "", imageFile: imageFilenameFromUrl(image) };
+    if (looksLikePainting(out) || looksLikeNonPersonImage(out)) return null;
+    return out;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getWikipediaImageByName(name, hints = "") {
+  const query = String(name || "").trim();
+  if (!query) return null;
+  try {
+    const params = new URLSearchParams({
+      action: "query",
+      format: "json",
+      origin: "*",
+      list: "search",
+      srnamespace: "0",
+      srlimit: "5",
+      srprop: "snippet",
+      srsearch: `${query}${hints ? ` ${hints}` : ""}`
+    });
+    const json = await fetchJsonWithTimeout(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { timeoutMs: 6500 });
+    const titles = (json?.query?.search || []).map(x => x.title).filter(Boolean);
+    if (!titles.length) return null;
+    const normalizeName = value => String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+    const wantedTokens = normalizeName(query).split(/\s+/).filter(Boolean);
+    const scored = titles.map(title => {
+      const tokens = normalizeName(title).split(/\s+/).filter(Boolean);
+      const overlap = wantedTokens.filter(t => tokens.includes(t)).length;
+      const exact = normalizeName(title) === normalizeName(query);
+      return { title, score: exact ? 100 : overlap * 10 - Math.abs(tokens.length - wantedTokens.length) };
+    }).sort((a,b) => b.score - a.score);
+    const best = scored[0];
+    if (!best || best.score < Math.max(10, wantedTokens.length * 6)) return null;
+    const safeTitles = [best.title];
+    const imageParams = new URLSearchParams({
+      action: "query",
+      format: "json",
+      origin: "*",
+      prop: "pageimages|pageterms",
+      piprop: "original|thumbnail",
+      pilicense: "free",
+      pithumbsize: "1200",
+      redirects: "1",
+      titles: safeTitles.join("|")
+    });
+    const imageJson = await fetchJsonWithTimeout(`https://en.wikipedia.org/w/api.php?${imageParams.toString()}`, { timeoutMs: 6500 });
+    const pages = Object.values(imageJson?.query?.pages || {});
+    for (const page of pages) {
+      const image = page?.original?.source || page?.thumbnail?.source || "";
+      if (!image) continue;
+      const candidate = { image: imageUrlFromWikidata(image), description: page?.pageterms?.description?.[0] || "", imageFile: imageFilenameFromUrl(image) };
+      if (looksLikePainting(candidate) || looksLikeNonPersonImage(candidate)) continue;
+      return candidate;
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function resolveImagesForRecords(records, maxConcurrent = 10) {
+  const queue = shuffle([...records]);
+  const resolved = [];
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= queue.length) return;
+      const record = queue[index];
+      try {
+        if (!isDisplayEligible(record)) continue;
+        // 1) Use an image explicitly supplied by the originating source.
+        if (record.image) {
+          record.imageFile = record.imageFile || imageFilenameFromUrl(record.image);
+          const loaded = await loadOneImage(record, { rejectArtwork: true });
+          if (loaded) {
+            const out = { ...record, neutralDescription: buildNeutralRecordDescription(record) };
+            resolved.push(out);
+            continue;
+          }
+        }
+
+        // 2) If the source gives us a Wikidata identifier, resolve the P18 image directly.
+        const ids = record.wikidataId ? [record.wikidataId] : [];
+        if (ids.length) {
+          const entities = await getWikidataEntities(ids);
+          const entity = entities[ids[0]];
+          const image = claimStringValues(entity, "P18")[0];
+          const label = entity?.labels?.en?.value || record.person;
+          const description = entity?.descriptions?.en?.value || record.description || "";
+          const deathDate = claimTimeValues(entity, "P570")[0] || record.deathDate || "";
+          const deathYear = yearFromWikidataTime(deathDate);
+          if (deathYear !== null && deathYear < 1900) continue;
+          const wikiUrl = wikipediaUrlFromEntity(entity) || record.wikipediaUrl || "";
+          if (image && label && !looksLikePainting({ ...record, imageFile: image, description }) && !looksLikeNonPersonImage({ ...record, imageFile: image, description })) {
+            const out = {
+              ...record,
+              personId: `${record.personId}-${ids[0]}`,
+              person: label,
+              description,
+              neutralDescription: neutralizeDescription(description),
+              imageFile: image,
+              image: `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(image)}?width=1000`,
+              source: record.source || `https://www.wikidata.org/wiki/${ids[0]}`,
+              wikidataId: ids[0],
+              wikipediaUrl: wikiUrl,
+              deathDate,
+              deathYear
+            };
+            await inspectCommonsImage(out);
+            if (!looksLikePainting(out)) {
+              const loaded = await loadOneImage(out, { rejectArtwork: true });
+              if (loaded) { resolved.push(out); continue; }
+            }
+          }
+        }
+
+        // 3) If the source gives a Wikipedia article, ask that wiki for its free lead image.
+        if (record.wikipediaUrl) {
+          const wiki = await getWikipediaPageImage(record.wikipediaUrl);
+          if (wiki?.image) {
+            const out = {
+              ...record,
+              image: wiki.image,
+              imageFile: wiki.imageFile || imageFilenameFromUrl(wiki.image),
+              description: wiki.description || record.description,
+              neutralDescription: neutralizeDescription(wiki.description || record.description),
+              directImage: true
+            };
+            const loaded = await loadOneImage(out, { rejectArtwork: true });
+            if (loaded) { resolved.push(out); continue; }
+          }
+        }
+
+        // 4) Final fallback: exact-ish English Wikipedia search using the person's name.
+        const wiki = await getWikipediaImageByName(record.person, record.nationalityLabel || record.nationality || "");
+        if (wiki?.image) {
+          const out = {
+            ...record,
+            image: wiki.image,
+            imageFile: wiki.imageFile || imageFilenameFromUrl(wiki.image),
+            description: wiki.description || record.description,
+            neutralDescription: neutralizeDescription(wiki.description || record.description),
+            directImage: true
+          };
+          if (!isDisplayEligible(out) || !looksLikeUsablePersonPhoto(out)) continue;
+          const loaded = await loadOneImage(out, { rejectArtwork: true });
+          if (loaded) resolved.push(out);
+        }
+      } catch (_) {}
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(maxConcurrent, Math.max(1, queue.length)) }, worker));
+  return dedupePeople(resolved);
+}
+
+function extractArrays(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+  const preferred = ["data", "items", "results", "records", "persons", "features"];
+  for (const key of preferred) if (Array.isArray(data[key])) return data[key];
+  for (const value of Object.values(data)) if (Array.isArray(value)) return value;
+  return [];
+}
+
+async function loadInitialWikidataCatalog() {
+  // Build a genuinely varied first catalog. We query several different search windows in parallel
+  // rather than taking the first alphabetical SPARQL rows, then shuffle the combined results.
+  const offsets = shuffle([0, 55, 110, 165, 220, 275, 330, 385]).slice(0, INITIAL_SEARCH_BATCHES);
+  const searches = offsets.map((offset) =>
+    loadRecordsViaWikidataSearch(INITIAL_SEARCH_PAGE_SIZE, offset, 0)
+      .catch(() => ({ criminals: [], controls: [] }))
+  );
+  const results = await Promise.all(searches);
+
+  let criminals = dedupePeople(results.flatMap(r => r.criminals || []));
+  if (criminals.length < Math.floor(INITIAL_CATALOG_TARGET * 0.55)) {
+    // One broader SPARQL request is a fallback, not the primary startup path.
+    try {
+      const fallback = await queryWikidata(buildCriminalQuery(260, Math.floor(Math.random() * 5) * 260), 9000);
+      criminals = dedupePeople([...criminals, ...mapCriminalRows(fallback)]);
+    } catch (error) {
+      console.warn("Initial Wikidata SPARQL expansion failed", error);
+    }
+  }
+
+  const filtered = criminals.filter(isDisplayEligible);
+  const varied = shuffle(filtered).slice(0, Math.max(INITIAL_CATALOG_TARGET, 120));
+  const fallbackRecords = shuffle(FALLBACK_RECORDS.filter(r => r.kind === "conviction")).slice(0, 12);
+  const records = dedupePeople([...varied, ...fallbackRecords]);
+  if (records.length < 30) throw new Error("The initial Wikidata catalog did not contain enough varied records.");
+  setSourceStatus("Wikidata", "ready", records.filter(r => sourceKeyForRecord(r) === "Wikidata" && r.image).length, records.filter(r => sourceKeyForRecord(r) === "Wikidata").length);
+  return records;
+}
+
+async function loadFullWikidataArchive(generation = state.gameGeneration) {
+  if (generation !== state.gameGeneration) return { total: 0 };
+  const criminalRecords = [];
+  const totalPages = WD_ARCHIVE_PAGES;
+  const pageOffsets = Array.from({ length: totalPages }, (_, i) => i * WD_PAGE_SIZE);
+  const waveSize = 3;
+  for (let i = 0; i < pageOffsets.length; i += waveSize) {
+    const wave = pageOffsets.slice(i, i + waveSize);
+    const results = await Promise.allSettled(wave.map(offset =>
+      queryWikidata(buildCriminalQuery(WD_PAGE_SIZE, offset), 18000).then(mapCriminalRows)
+    ));
+    if (generation !== state.gameGeneration) return { total: 0 };
+    results.forEach(result => {
+      if (result.status === "fulfilled") criminalRecords.push(...result.value);
+    });
+    const completedPages = Math.min(i + wave.length, totalPages);
+    const pct = Math.round((completedPages / totalPages) * 76);
+    const unique = dedupePeople(criminalRecords).length;
+    setLoading(
+      "Loading the full Wikidata archive...",
+      "Building the main public-record case catalog. Secondary databases will be merged silently after the game opens.",
+      pct,
+      `${completedPages} of ${totalPages} archive batches loaded · ${unique} unique cases`
+    );
+  }
+
+  let records = dedupePeopleAllowNoImage(criminalRecords.filter(isDisplayEligible), 12000);
+  if (records.length < 120) {
+    try {
+      const apiPool = await loadRecordsViaWikidataSearch();
+      records = dedupePeopleAllowNoImage([...records, ...apiPool.criminals].filter(isDisplayEligible), 12000);
+    } catch (error) {
+      console.warn("Wikidata API expansion failed", error);
+    }
+  }
+  const controls = (() => {
+    const fallbackControls = FALLBACK_RECORDS.filter(r => r.kind === "no-conviction");
+    return shuffle(fallbackControls).slice(0, 2);
+  })();
+  records = dedupePeople([...records, ...controls]);
+  if (records.length < 8) throw new Error("The Wikidata archive did not return enough playable records.");
+  state.records = dedupePeopleAllowNoImage([...state.records, ...records], 12000);
+  const resolved = await resolveImagesForRecords(records.slice(0, 1800), 16);
+  if (resolved.length) mergeBackgroundRecords(resolved, generation);
+  setSourceStatus("Wikidata", "ready", state.records.filter(r => sourceKeyForRecord(r) === "Wikidata" && r.image).length, state.records.filter(r => sourceKeyForRecord(r) === "Wikidata").length);
+  state.lastSyncedAt = Date.now();
+  saveCatalogCache();
+  return { total: records.length };
+}
+
+function updatePossibleCaseCount() {
+  const count = document.getElementById("caseCount");
+  if (count) count.textContent = String(state.playableRecords?.length || 0);
+}
+
+function mergeBackgroundRecords(records, generation = state.gameGeneration) {
+  if (generation !== state.gameGeneration) return 0;
+  const incoming = dedupePeopleAllowNoImage(records || [], 12000).filter(record => isDisplayEligible(record) && (!record.image || looksLikeUsablePersonPhoto(record)));
+  if (!incoming.length) return 0;
+  const before = state.records.length;
+  const beforePlayable = state.playableRecords.length;
+  state.records = dedupePeopleAllowNoImage([...state.records, ...incoming], 12000);
+  const added = state.records.length - before;
+  const newlyPlayable = incoming.filter(r => r.image);
+  state.playableRecords = dedupePeople([...state.playableRecords, ...newlyPlayable]);
+  const playableAdded = state.playableRecords.length - beforePlayable;
+  const bySource = new Map();
+  for (const record of incoming) {
+    const key = sourceKeyForRecord(record);
+    bySource.set(key, (bySource.get(key) || 0) + 1);
+  }
+  for (const [key] of bySource) {
+    const sourceRecords = state.records.filter(r => sourceKeyForRecord(r) === key);
+    const playable = sourceRecords.filter(r => looksLikeUsablePersonPhoto(r)).length;
+    setSourceStatus(key, "ready", playable, Math.max(sourceStats[key]?.raw || 0, sourceRecords.length));
+  }
+  renderSourcePanel();
+  if (!$('game').classList.contains('hidden')) {
+    updatePossibleCaseCount();
+    $("poolStatus").textContent = "";
+    $("poolStatus").classList.add("ready");
+  }
+  if (added || playableAdded) {
+    console.debug(`Background public-record sources added ${added} catalog records and ${playableAdded} playable cases to the pool.`);
+    saveCatalogCache();
+  }
+  return added;
+}
+
+async function loadBackgroundArchive(generation = state.gameGeneration) {
+  if (generation !== state.gameGeneration) return { total: state.records.length };
+  const tasks = [];
+
+  if (state.pendingEuropol?.length) {
+    tasks.push(resolveImagesForRecords(state.pendingEuropol, 6)
+      .then(records => mergeBackgroundRecords(records, generation))
+      .then(() => { state.pendingEuropol = []; saveCatalogCache(); })
+      .catch(error => console.warn("Europol background image expansion failed", error)));
+  }
+
+  tasks.push(loadFullWikidataArchive(generation).catch(error => console.warn("Wikidata background archive failed", error)));
+  tasks.push(loadFbiWantedRecords({ pageSize: 50, maxPages: 30, maxPlayable: 400, timeoutMs: 7000, generation })
+    .then(async records => mergeBackgroundRecords(await resolveImagesForRecords(records, 12), generation))
+    .catch(error => console.warn("FBI background source failed", error)));
+  tasks.push(loadOpenSanctionsSources(generation)
+    .catch(error => console.warn("OpenSanctions background source failed", error)));
+
+  const results = await Promise.allSettled(tasks);
+  results.forEach(result => { if (result.status === "rejected") console.warn(result.reason); });
+  saveCatalogCache();
+  return { total: state.records.length };
+}
+
+function setImageRecordStatus(record, ok) {
+  if (ok) {
+    state.failedIds.delete(record.personId);
+  } else {
+    state.failedIds.add(record.personId);
+  }
+}
+
+async function preloadPlayableImages({ sourceLabel = "first cases", targetCount = INITIAL_PRELOAD } = {}) {
+  const candidates = shuffle(
+    state.records.filter(r => !state.failedIds.has(r.personId) && looksLikeUsablePersonPhoto(r))
+  ).slice(0, Math.min(targetCount, state.records.length));
+  const total = candidates.length;
+  let started = 0, completed = 0, accepted = 0, cursor = 0;
+  const acceptedRecords = [];
+  const workerCount = Math.min(8, Math.max(2, total));
+
+  $("connectingVisual").classList.add("hidden");
+  $("loadingProgress").classList.remove("hidden");
+
+  const updateProgress = (phase) => {
+    const startPct = total ? (started / total) * 22 : 0;
+    const donePct = total ? (completed / total) * 78 : 0;
+    const pct = Math.round(Math.min(100, startPct + donePct));
+    setLoading(
+      `Preparing ${sourceLabel}...`,
+      `The opening cases are fully prepared before play begins, so no live image swapping can occur after the game opens.`,
+      pct,
+      `${completed} of ${total} images ready · ${accepted} playable${phase ? ` · ${phase}` : ""}`
+    );
+  };
+  updateProgress("starting image requests");
+
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= total) return;
+      started += 1;
+      updateProgress(`request ${started}`);
+      const record = await loadOneImage(candidates[index]);
+      completed += 1;
+      setImageRecordStatus(candidates[index], Boolean(record));
+      if (record) {
+        accepted += 1;
+        acceptedRecords.push(record);
+      }
+      updateProgress(record ? "image ready" : "image unavailable");
+    }
+  }
+  await Promise.all(Array.from({ length: workerCount }, worker));
+
+  if (accepted < Math.min(12, targetCount)) {
+    const extra = shuffle(
+      state.records.filter(r => !state.failedIds.has(r.personId) && r.image && !candidates.some(c => c.personId === r.personId) && !looksLikePainting(r))
+    ).slice(0, Math.max(12, targetCount));
+    for (const record of extra) {
+      started += 1;
+      updateProgress("checking another image");
+      const loaded = await loadOneImage(record);
+      completed += 1;
+      setImageRecordStatus(record, Boolean(loaded));
+      if (loaded) {
+        accepted += 1;
+        acceptedRecords.push(loaded);
+      }
+      updateProgress(loaded ? "image ready" : "image unavailable");
+      if (accepted >= Math.min(targetCount, 16)) break;
+    }
+  }
+
+  if (accepted < Math.min(8, targetCount)) throw new Error("Not enough playable images could be prepared.");
+  state.playableRecords = dedupePeople(acceptedRecords);
+  renderSourcePanel();
+  state.initialPoolReady = true;
+  setLoading("Initial case pool ready", "The opening set is fully prepared. The other public archives will continue expanding the pool in the background.", 100, `${state.playableRecords.length} ready cases · ${state.records.length} catalog records available`);
+  return state.playableRecords;
+}
+
+function loadOneImage(record, { rejectArtwork = true } = {}) {
+  return new Promise(resolve => {
+    if (!record?.image || (rejectArtwork && (looksLikePainting(record) || looksLikeNonPersonImage(record)))) { resolve(null); return; }
+    const img = new Image();
+    let done = false;
+    const finish = ok => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(ok ? record : null);
+    };
+    const timer = setTimeout(() => finish(false), IMAGE_TIMEOUT_MS);
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => finish(true);
+    img.onerror = () => finish(false);
+    img.src = record.image;
+  });
+}
+
+function resetHelps() {
+  state.used = { fifty: false, clue: false, appeal: false };
+  state.appealActive = false;
+  ["help5050", "helpClue", "helpAppeal"].forEach(id => { $(id).disabled = false; });
+  $("helpPrompt").classList.add("hidden");
+  $("helpPromptTitle").textContent = "";
+  $("helpPromptCopy").textContent = "";
+}
+
+function resetLives() {
+  state.mistakes = 0;
+  const hearts = [...$("hearts").querySelectorAll(".heart")];
+  hearts.forEach(h => h.classList.remove("lost", "stabbed"));
+  $("hearts").setAttribute("aria-label", `${state.maxMistakes} lives remaining`);
+}
+
+function showHelpPrompt(title, copy) {
+  $("helpPromptTitle").textContent = title;
+  $("helpPromptCopy").textContent = copy;
+  $("helpPrompt").classList.remove("hidden");
+}
+
+function offenseDetailText(record) {
+  const parts = [];
+  if (record.kind === "wanted" && record.offenseDetails) parts.push(record.offenseDetails);
+  if (record.crimeDescription) parts.push(record.crimeDescription);
+  if (record.kind === "conviction" && record.convictionDate) {
+    const date = new Date(record.convictionDate);
+    if (!Number.isNaN(date.getTime())) parts.push(`The conviction record is dated ${date.getUTCFullYear()}.`);
+  }
+  const unique = [...new Set(parts.map(v => String(v || "").trim()).filter(Boolean))];
+  return unique.slice(0, 2).join(" ") || "The public record identifies this offense category but provides no longer English summary in the dataset.";
+}
+
+function caseDetail(record) {
+  const bio = buildNeutralRecordDescription(record);
+  if (record.kind === "no-conviction") {
+    return `${record.person}: ${bio}. No conviction is recorded for this person in the current dataset. This is a dataset status, not a determination of innocence.`;
+  }
+  const sourceLabel = record.sourceName ? `${record.sourceName}` : "public record";
+  const detail = offenseDetailText(record);
+  if (record.kind === "wanted") {
+    return `${record.person}: ${bio}. ${sourceLabel} lists the alleged/recorded offense as ${record.crime}. Detail: ${detail}`;
+  }
+  return `${record.person}: ${bio}. The public record records a conviction for ${record.crime}. Detail: ${detail}`;
+}
+
+function selectRecord() {
+  let sourcePool = state.playableRecords.length ? state.playableRecords : state.records;
+  let pool = sourcePool.filter(r => isDisplayEligible(r) && !state.previousIds.has(r.personId) && !state.failedIds.has(r.personId));
+  if (!pool.length) return null;
+
+  // Keep non-conviction records genuinely rare, and rotate sources so one feed does not dominate the opening.
+  if (Math.random() > 0.985) {
+    const controls = pool.filter(r => r.kind === "no-conviction");
+    if (controls.length) pool = controls;
+  } else {
+    const nonControls = pool.filter(r => r.kind !== "no-conviction");
+    if (nonControls.length) pool = nonControls;
+  }
+
+  const recentSourceKeys = [...state.previousIds].slice(-4).map(id => state.records.find(r => r.personId === id)?.sourceName).filter(Boolean);
+  const diversified = pool.filter(r => !recentSourceKeys.includes(r.sourceName));
+  const candidatePool = diversified.length >= 6 ? diversified : pool;
+  const record = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+  state.previousIds.add(record.personId);
+  return record;
+}
+
+function hideOutcome() {
+  $("caseOutcome").classList.add("hidden");
+  $("caseOutcome").classList.remove("good", "bad");
+  $("game").classList.remove("outcome-visible");
+  $("caseOutcome").setAttribute("aria-hidden", "true");
+  $("caseOutcomeScore").classList.add("hidden");
+  $("caseOutcomeScore").textContent = "";
+}
+
+function personOnlyDetail(record) {
+  const bio = buildNeutralRecordDescription(record);
+  if (!bio || bio === "Public-record subject.") {
+    return `${record.person} appears in the linked public record.`;
+  }
+  return `${record.person}: ${bio}.`;
+}
+
+function photoSourceLabel(record) {
+  const imageUrl = String(record?.image || "");
+  if (/commons\.wikimedia\.org/i.test(imageUrl) || /wikimedia\.org\/wiki\/Special:Redirect\/file/i.test(imageUrl)) {
+    return "Wikimedia Commons";
+  }
+  if (/fbi\.gov/i.test(imageUrl)) return "FBI Wanted";
+  if (/europol\.europa\.eu/i.test(imageUrl)) return "Europol";
+  if (/nationalcrimeagency\.gov\.uk|nca\.gov\.uk/i.test(imageUrl)) return "UK NCA";
+  return record?.sourceName || "Public source";
+}
+
+function photoSourceUrl(record) {
+  return record?.imagePage || record?.photoSource || record?.source || "#";
+}
+
+function showOutcome({correct, gameOver = false, chosen = null}) {
+  // Once an answer is resolved, collapse any open help prompt so the result and
+  // Next case control always have their own space on small screens.
+  $("helpPrompt").classList.add("hidden");
+  const outcome = $("caseOutcome");
+  outcome.classList.remove("hidden", "good", "bad");
+  outcome.setAttribute("aria-hidden", "false");
+  $("game").classList.add("outcome-visible");
+  outcome.classList.add(correct ? "good" : "bad");
+  const scoreBox = $("caseOutcomeScore");
+  scoreBox.classList.add("hidden");
+  scoreBox.textContent = "";
+  const correctAnswer = state.current?.crime;
+  const yourAnswerLine = chosen != null ? `You answered: “${chosen}.”` : "";
+  if (gameOver) {
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", "#6f1822");
+    $("caseOutcomeTitle").textContent = "GAME OVER";
+    scoreBox.textContent = `FINAL SCORE  ${state.score}`;
+    scoreBox.classList.remove("hidden");
+    $("caseOutcomeCopy").textContent = [yourAnswerLine, `The public record lists: “${correctAnswer}.”`].filter(Boolean).join(" ");
+    $("caseOutcomeDetail").textContent = personOnlyDetail(state.current);
+    $("nextCase").textContent = "Retry game";
+  } else if (correct) {
+    $("caseOutcomeTitle").textContent = "CORRECT  +1 POINT";
+    $("caseOutcomeCopy").textContent = [yourAnswerLine, "That matches the public record."].filter(Boolean).join(" ");
+    $("caseOutcomeDetail").textContent = personOnlyDetail(state.current);
+    $("nextCase").textContent = "Next case";
+  } else {
+    $("caseOutcomeTitle").textContent = "INCORRECT  −1 LIFE";
+    $("caseOutcomeCopy").textContent = [yourAnswerLine, `The public record lists: “${correctAnswer}.”`].filter(Boolean).join(" ");
+    $("caseOutcomeDetail").textContent = personOnlyDetail(state.current);
+    $("nextCase").textContent = "Next case";
+  }
+}
+
+function prefetchNextImages(count = 2) {
+  const candidates = shuffle((state.playableRecords || [])
+    .filter(r => r && r.image && !state.previousIds.has(r.personId) && r.personId !== state.current?.personId)
+  ).slice(0, count);
+  for (const record of candidates) {
+    const img = new Image();
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.src = record.image;
+  }
+}
+
+function makeQuestion() {
+  if (state.isOpening) return;
+  state.answered = false;
+  state.appealActive = false;
+  $("status").textContent = "";
+  $("status").className = "status";
+  hideOutcome();
+  $("helpPrompt").classList.add("hidden");
+  $("answers").classList.add("hidden");
+  $("answers").innerHTML = "";
+  $("answersPlaceholder").classList.remove("hidden");
+  $("answersPlaceholder").textContent = "Loading the case image before revealing the answer choices.";
+
+  const next = selectRecord();
+  if (!next) {
+    $("answersPlaceholder").textContent = "No unseen loaded cases remain in this run.";
+    $("caseOutcomeTitle").textContent = "Archive exhausted";
+    $("caseOutcomeCopy").textContent = `You reached the end of ${state.records.length} unique loaded records without repeating a case.`;
+    $("caseOutcomeDetail").textContent = "Start a new game to reshuffle the archive.";
+    $("caseOutcome").classList.remove("hidden");
+    $("caseOutcome").classList.add("good");
+    $("nextCase").textContent = "New game";
+    return;
+  }
+
+  state.current = next;
+  if (state.current.kind === "wanted") {
+    $("questionText").textContent = "Which offense is identified in this public record?";
+  } else if (state.current.kind === "no-conviction") {
+    $("questionText").textContent = "Which offense is identified in this public record?";
+  } else {
+    $("questionText").textContent = "Which offense is identified in this public record?";
+  }
+  const currentForImage = state.current;
+  const pendingRound = state.round + 1;
+  let roundCommitted = false;
+  const commitRound = () => {
+    if (roundCommitted || state.current !== currentForImage) return;
+    roundCommitted = true;
+    state.round = pendingRound;
+    $("roundLabel").textContent = state.round;
+  };
+  const image = $("personImage");
+  image.onload = () => {
+    if (state.current !== currentForImage) return;
+    commitRound();
+    buildChoices();
+  };
+  image.onerror = () => {
+    if (state.current !== currentForImage) return;
+    setImageRecordStatus(currentForImage, false);
+    $("answersPlaceholder").textContent = "This image could not be displayed. Loading another case.";
+    state.answered = true;
+    setTimeout(() => {
+      state.answered = false;
+      makeQuestion();
+    }, 300);
+  };
+  image.classList.toggle("no-filter", currentForImage.noFilter === true);
+  image.src = currentForImage.image;
+  image.alt = `Image associated with the public record for ${currentForImage.person}`;
+  $("personName").textContent = currentForImage.person;
+  const sourceLink = $("recordSource");
+  sourceLink.textContent = currentForImage.sourceName || "Public source";
+  sourceLink.href = currentForImage.source || "#";
+  sourceLink.title = currentForImage.source || "Public source";
+  const photoSource = $("photoSourceTab");
+  photoSource.textContent = photoSourceLabel(currentForImage);
+  photoSource.href = photoSourceUrl(currentForImage);
+  photoSource.title = photoSourceUrl(currentForImage);
+  updatePossibleCaseCount();
+  $("score").textContent = state.score;
+
+  if (image.complete && image.naturalWidth > 0) image.onload();
+}
+
+function shortCrimeMeaning(crime, record) {
+  const label = String(crime || "").trim();
+  const normalized = label.toLowerCase();
+  if (!label) return "Public-record offense category.";
+  if (label === NO_CONVICTION.toLowerCase()) return "The dataset has no recorded conviction for this person.";
+
+  const definitions = [
+    [/\bhomicide\b|\bmurder\b/, "Unlawfully causing another person's death."],
+    [/manslaughter/, "Causing another person's death without the legal intent for murder."],
+    [/robbery/, "Taking property from someone using force or threat."],
+    [/burglary/, "Illegally entering a building to commit a crime, often theft."],
+    [/\btheft\b|larceny/, "Taking someone else's property without permission."],
+    [/fraud|fraudulent/, "Deceiving someone for money, property, or another gain."],
+    [/embezzlement/, "Taking money or property entrusted to you."],
+    [/bribery|corruption/, "Improperly giving, receiving, or using influence or payment."],
+    [/kidnapping|abduction/, "Taking or holding a person against their will."],
+    [/extortion/, "Obtaining money or action through threats or coercion."],
+    [/arson/, "Deliberately setting fire to property."],
+    [/drug trafficking|narcotics trafficking|drug distribution/, "Illegally transporting or distributing controlled drugs."],
+    [/money laundering/, "Hiding or disguising the criminal origin of money."],
+    [/racketeering|organized crime/, "Participating in an organized criminal enterprise."],
+    [/assault/, "Intentionally using or threatening unlawful physical force."],
+    [/sexual abuse|sexual assault|rape/, "Non-consensual sexual contact or exploitation."],
+    [/human trafficking|trafficking in persons/, "Exploiting or transporting people through coercion or deception."],
+    [/weapons trafficking|arms trafficking|illegal possession of weapons/, "Illegally obtaining, moving, selling, or possessing weapons."],
+    [/terrorism|terrorist offense/, "Violence or threats intended to intimidate or coerce for a wider cause."],
+    [/espionage|spying/, "Secretly obtaining or passing protected information."],
+    [/tax evasion/, "Deliberately avoiding legally owed taxes."],
+    [/cybercrime|computer crime|hacking/, "Using computers or networks to commit or facilitate a crime."],
+    [/forgery|counterfeiting/, "Making or altering false documents, money, or records."],
+    [/perjury/, "Knowingly giving false information under oath."],
+    [/complicity|aiding and abetting/, "Knowingly helping another person commit an offense."],
+    [/conspiracy/, "Agreeing with others to commit an unlawful act."],
+    [/fraudulent bankruptcy|bankruptcy fraud/, "Using deception to misuse or conceal assets in insolvency."],
+    [/smuggling/, "Illegally moving people or goods across a border or controlled area."],
+  ];
+  for (const [pattern, meaning] of definitions) if (pattern.test(normalized)) return meaning;
+
+  const sourceMeaning = record?.crimeDescription || record?.offenseDetails || "";
+  const cleaned = String(sourceMeaning).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  if (cleaned && cleaned.length >= 12 && !/[\u0400-\u04ff\u0370-\u03ff]/.test(cleaned)) {
+    const short = cleaned.replace(/^.*?:\s*/, "").replace(/[.!?].*$/, "");
+    if (short.length >= 12 && short.length <= 105) return short.charAt(0).toUpperCase() + short.slice(1);
+  }
+  return "A legally defined offense involving conduct prohibited by law.";
+}
+
+function buildChoices() {
+  const current = state.current;
+  const offensePool = [...new Set(state.records
+    .filter(r => (r.kind === "conviction" || r.kind === "wanted") && r.crime && r.crime !== current.crime)
+    .map(r => r.crime))];
+  const currentCrime = current.crime;
+  let choices;
+
+  if (current.kind === "no-conviction") {
+    choices = shuffle([currentCrime, ...shuffle(offensePool).slice(0, 3)]);
+  } else {
+    const includeNoConviction = Math.random() < 0.08;
+    const distractorCount = includeNoConviction ? 2 : 3;
+    const distractors = shuffle(offensePool).slice(0, distractorCount);
+    if (includeNoConviction) distractors.push(NO_CONVICTION);
+    choices = shuffle([currentCrime, ...distractors]);
+  }
+
+  if (choices.length < 4) {
+    $("status").textContent = "The archive did not contain four distinct answer categories for this case. Choosing another case.";
+    $("status").className = "status warn";
+    setTimeout(makeQuestion, 250);
+    return;
+  }
+
+  const answers = $("answers");
+  answers.innerHTML = "";
+  ["A", "B", "C", "D"].forEach((letter, index) => {
+    const choice = choices[index];
+    const exemplar = state.records.find(r => r.crime === choice);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "answer";
+    btn.dataset.letter = letter;
+    btn.dataset.choice = choice;
+    const label = document.createElement("span");
+    label.className = "answer-label";
+    label.textContent = choice;
+    const meaning = document.createElement("span");
+    meaning.className = "answer-meaning";
+    meaning.textContent = shortCrimeMeaning(choice, exemplar);
+    btn.appendChild(label);
+    btn.appendChild(meaning);
+    btn.addEventListener("click", () => answer(choice, btn));
+    answers.appendChild(btn);
+  });
+  $("answersPlaceholder").classList.add("hidden");
+  answers.classList.remove("hidden");
+  prefetchNextImages(2);
+}
+
+function lockAnswers() {
+  [...$("answers").querySelectorAll("button")].forEach(b => b.disabled = true);
+}
+
+function markMistake() {
+  state.mistakes += 1;
+  const heart = $("hearts").querySelectorAll(".heart")[state.mistakes - 1];
+  if (heart) heart.classList.add("lost", "stabbed");
+  $("hearts").setAttribute("aria-label", `${Math.max(0, state.maxMistakes - state.mistakes)} lives remaining`);
+}
+
+function answer(choice, clickedButton) {
+  if (state.answered) return;
+  state.answered = true;
+  lockAnswers();
+
+  if (choice === state.current.crime) {
+    clickedButton.classList.add("correct");
+    state.score += 1;
+    $("score").textContent = state.score;
+    $("status").textContent = "";
+    showOutcome({correct:true, chosen: choice});
+    return;
+  }
+
+  clickedButton.classList.add("wrong");
+  const correct = [...$("answers").querySelectorAll("button")].find(b => b.dataset.choice === state.current.crime);
+  if (correct) correct.classList.add("correct");
+
+  if (state.appealActive) {
+    state.appealActive = false;
+    $("status").textContent = "";
+    showHelpPrompt("Appeal used", "This incorrect answer was forgiven. No life was lost.");
+    showOutcome({correct:false, gameOver:false, chosen: choice});
+    $("caseOutcomeCopy").textContent = `You answered: “${choice}.” Appeal accepted — no life was lost. The public record lists: “${state.current.crime}.”`;
+    return;
+  }
+
+  markMistake();
+  const gameOver = state.mistakes >= state.maxMistakes;
+  $("status").textContent = "";
+  if (gameOver) document.body.classList.add("loss-state");
+  showOutcome({correct:false, gameOver, chosen: choice});
+}
+
+function useFiftyFifty() {
+  if (state.used.fifty || state.answered || $("answers").classList.contains("hidden")) return;
+  state.used.fifty = true;
+  $("help5050").disabled = true;
+  const wrongButtons = shuffle([...( $("answers").querySelectorAll("button") )].filter(b => b.dataset.choice !== state.current.crime));
+  wrongButtons.slice(0, 2).forEach(btn => btn.classList.add("removed"));
+  showHelpPrompt("50 / 50", "Two incorrect answer choices have been removed.");
+}
+
+function useClue() {
+  if (state.used.clue || state.answered || $("answers").classList.contains("hidden")) return;
+  state.used.clue = true;
+  $("helpClue").disabled = true;
+  showHelpPrompt("Case note", buildNeutralRecordDescription(state.current));
+}
+
+function useAppeal() {
+  if (state.used.appeal || state.answered || $("answers").classList.contains("hidden")) return;
+  state.used.appeal = true;
+  state.appealActive = true;
+  $("helpAppeal").disabled = true;
+  showHelpPrompt("Appeal active", "Your next wrong answer will be shown as incorrect but will not cost a life.");
+}
+
+function resetUiForNewGame() {
+  $("app")?.classList.add("lobby-view");
+  $("app")?.classList.remove("game-view");
+  $("loading").classList.remove("hidden");
+  $("loading").classList.add("lobby-mode");
+  $("loading").classList.remove("waiting-mode");
+  $("game").classList.add("hidden");
+  $("answers").classList.add("hidden");
+  $("answersPlaceholder").classList.remove("hidden");
+  $("answersPlaceholder").textContent = "The case image will be loaded before the answer choices appear.";
+  $("archiveRetry").classList.add("hidden");
+  $("playButton").disabled = false;
+  $("playButton").setAttribute("aria-disabled", "false");
+  $("playButton").textContent = "Open the case";
+  $("readyHint").textContent = "";
+  $("archiveNote").textContent = "";
+  $("loadingProgress").classList.add("hidden");
+  $("connectingVisual").classList.remove("hidden");
+  $("progressFill").style.width = "0%";
+  $("progressText").textContent = "";
+  $("loadingTitle").textContent = "";
+  $("loadingCopy").textContent = "";
+  $("helpPrompt").classList.add("hidden");
+  hideOutcome();
+}
+
+function enterGameView() {
+  if (!state.initialPoolReady) return false;
+  $("app")?.classList.remove("lobby-view");
+  $("app")?.classList.add("game-view");
+  state.lobbyReady = false;
+  state.lobbyClickWaiting = false;
+  $("playButton").disabled = true;
+  $("playButton").setAttribute("aria-disabled", "true");
+  $("loading").classList.add("hidden");
+  $("loading").classList.remove("waiting-mode");
+  $("game").classList.remove("hidden");
+  updatePossibleCaseCount();
+  updatePossibleCaseCount();
+  $("poolStatus").textContent = "";
+  $("poolStatus").classList.add("ready");
+  makeQuestion();
+  if (!state.backgroundSyncPromise) {
+    state.backgroundSyncStartedAt = Date.now();
+    state.backgroundSyncPromise = launchIndependentBackgroundSync(state.gameGeneration);
+  }
+  return true;
+}
+
+async function preloadPlayableImagesFromRecords(records, targetCount = 8) {
+  const accepted = [];
+  const candidates = shuffle(records || []).filter(r => r?.image && isDisplayEligible(r) && looksLikeUsablePersonPhoto(r));
+  const total = Math.min(candidates.length, Math.max(targetCount, 12));
+  const work = candidates.slice(0, total);
+  let cursor = 0;
+  let completed = 0;
+  let started = 0;
+
+  const update = (_phase = "loading image") => {};
+
+  const worker = async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= work.length || accepted.length >= targetCount) return;
+      started += 1;
+      update(`request ${started}`);
+      const record = work[index];
+      const loaded = await loadOneImage(record);
+      completed += 1;
+      setImageRecordStatus(record, Boolean(loaded));
+      if (loaded) accepted.push(loaded);
+      update(loaded ? "image ready" : "image rejected");
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(10, Math.max(1, work.length)) }, worker));
+  return dedupePeople(accepted).slice(0, targetCount);
+}
+
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function waitForAcceptableOpening(generation, timeoutMs = OPENING_WAIT_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+  while (generation === state.gameGeneration && Date.now() < deadline) {
+    const playable = state.playableRecords.length;
+    const records = state.records.length;
+    const acceptable = playable >= MIN_ACCEPTABLE_START_CASES || (playable >= 12 && records >= MIN_ACCEPTABLE_CATALOG_RECORDS);
+    if (acceptable) return true;
+    await sleep(900);
+  }
+  return false;
+}
+
+function activeCatalogRecords(records) {
+  const allowed = new Set(SOURCE_DEFINITIONS.map(s => s.key));
+  return dedupePeopleAllowNoImage((records || []).filter(record => allowed.has(sourceKeyForRecord(record))), CATALOG_CACHE_MAX_RECORDS);
+}
+
+async function loadFastWikidataBootstrap(generation = state.gameGeneration) {
+  if (generation !== state.gameGeneration) return [];
+  const offsets = shuffle([0, 50, 100, 150, 200, 250, 300, 350]).slice(0, 4);
+  const batches = await Promise.allSettled(offsets.map(offset =>
+    loadRecordsViaWikidataSearch(50, offset, 0).catch(() => ({ criminals: [], controls: [] }))
+  ));
+  if (generation !== state.gameGeneration) return [];
+  return shuffle(dedupePeopleAllowNoImage(
+    batches.flatMap(r => r.status === "fulfilled" ? (r.value?.criminals || []) : []), 500
+  ).filter(isDisplayEligible));
+}
+
+async function bootstrapOpeningPool(generation) {
+  setSourceStatus("Wikidata", "loading", sourceStats.Wikidata?.count || 0, sourceStats.Wikidata?.raw || 0);
+  setSourceStatus("FBI Wanted", "loading", sourceStats["FBI Wanted"]?.count || 0, sourceStats["FBI Wanted"]?.raw || 0);
+  const [wd, fbi] = await Promise.all([
+    loadFastWikidataBootstrap(generation),
+    loadFbiWantedRecords({ pageSize: 40, maxPages: 3, maxPlayable: 60, timeoutMs: 5000, generation }).catch(() => [])
+  ]);
+  if (generation !== state.gameGeneration) return [];
+  if (wd.length) mergeBackgroundRecords(wd, generation);
+  if (fbi.length) mergeBackgroundRecords(fbi, generation);
+  const candidatePool = shuffle(state.records.filter(isDisplayEligible)).slice(0, 140);
+  const prepared = await resolveImagesForRecords(candidatePool, 14);
+  if (generation === state.gameGeneration && prepared.length) mergeBackgroundRecords(prepared, generation);
+  return shuffle(state.records.filter(r => looksLikeUsablePersonPhoto(r) && isDisplayEligible(r))).slice(0, 36);
+}
+
+function launchIndependentBackgroundSync(generation) {
+  const jobs = [
+    loadInitialWikidataCatalog(generation).then(async records => {
+      if (generation !== state.gameGeneration) return;
+      if (records?.length) mergeBackgroundRecords(records, generation);
+      const candidates = shuffle((records || []).filter(r => !r.image && isDisplayEligible(r))).slice(0, 600);
+      if (candidates.length) {
+        const prepared = await resolveImagesForRecords(candidates, 16);
+        if (generation === state.gameGeneration) mergeBackgroundRecords(prepared, generation);
+      }
+    }).catch(error => {
+      if (generation === state.gameGeneration) setSourceStatus("Wikidata", "error", sourceStats.Wikidata?.count || 0, sourceStats.Wikidata?.raw || 0);
+      console.warn("Wikidata expansion failed", error);
+    }),
+    loadFullWikidataArchive(generation).catch(error => console.warn("Full Wikidata archive failed", error)),
+    loadFbiWantedRecords({ pageSize: 60, maxPages: 40, maxPlayable: 500, timeoutMs: 7000, generation })
+      .then(records => resolveImagesForRecords(records, 14)).then(records => mergeBackgroundRecords(records, generation))
+      .catch(error => console.warn("FBI background load failed", error)),
+    loadOpenSanctionsSources(generation).catch(error => console.warn("Europol / UK background load failed", error))
+  ];
+  return Promise.allSettled(jobs).then(async () => {
+    if (generation !== state.gameGeneration) return;
+    state.lastSyncedAt = Date.now();
+    await saveCatalogCache();
+    rebuildSourceCounts(state.records, true);
+  });
+}
+
+async function prepareOpeningPool(generation) {
+  if (generation !== state.gameGeneration) return false;
+  const startedAt = Date.now();
+  try {
+    let cached = null;
+    try { cached = activeCatalogRecords(await loadCatalogCacheAsync()); } catch (_) { cached = null; }
+    if (cached?.length) {
+      state.records = shuffle(cached);
+      rebuildSourceCounts(state.records, true);
+    }
+
+    // Live archive work begins immediately and stays independent from the lobby.
+    const warmupPromise = bootstrapOpeningPool(generation).catch(error => {
+      console.warn("Opening warm-up failed", error);
+      return [];
+    });
+
+    // Reuse cached playable cases first, but never force a fixed first-seven sequence.
+    const cachedCandidates = shuffle(state.records.filter(r => looksLikeUsablePersonPhoto(r) && isDisplayEligible(r))).slice(0, 80);
+    if (cachedCandidates.length) {
+      const ready = await preloadPlayableImagesFromRecords(cachedCandidates, Math.min(20, cachedCandidates.length));
+      if (ready.length) mergeBackgroundRecords(ready, generation);
+    }
+
+    const cachedEnough = state.playableRecords.length >= MIN_ACCEPTABLE_START_CASES && state.records.length >= MIN_ACCEPTABLE_CATALOG_RECORDS;
+    if (!cachedEnough) {
+      const warmupWait = Promise.race([warmupPromise, new Promise(resolve => setTimeout(() => resolve([]), Math.max(0, OPENING_PREP_TIMEOUT_MS - (Date.now() - startedAt))))]);
+      const warmed = await warmupWait;
+      if (generation !== state.gameGeneration) return false;
+      if (warmed?.length) {
+        const openingCandidates = shuffle(warmed).filter(r => isDisplayEligible(r));
+        if (openingCandidates.length) {
+          const ready = await preloadPlayableImagesFromRecords(openingCandidates, Math.min(20, openingCandidates.length));
+          if (ready.length) mergeBackgroundRecords(ready, generation);
+        }
+      }
+    }
+
+    // Build a larger randomized opening pool from everything already available.
+    const candidates = shuffle(state.records.filter(r => isDisplayEligible(r) && r.image && looksLikeUsablePersonPhoto(r))).slice(0, 120);
+    if (state.playableRecords.length < MIN_ACCEPTABLE_START_CASES && candidates.length) {
+      const ready = await preloadPlayableImagesFromRecords(candidates, MIN_ACCEPTABLE_START_CASES);
+      if (ready.length) mergeBackgroundRecords(ready, generation);
+    }
+
+    // Give the fast live warm-up a final bounded window, never the whole archive.
+    if (state.playableRecords.length < MIN_ACCEPTABLE_START_CASES && Date.now() - startedAt < OPENING_PREP_TIMEOUT_MS) {
+      const warmed = await Promise.race([warmupPromise, new Promise(resolve => setTimeout(() => resolve([]), 6000))]);
+      if (warmed?.length) {
+        const ready = await preloadPlayableImagesFromRecords(shuffle(warmed), MIN_ACCEPTABLE_START_CASES);
+        if (ready.length) mergeBackgroundRecords(ready, generation);
+      }
+    }
+
+    // If the live archive is unreachable, use the built-in public-record seed only as an emergency fallback.
+    if (state.playableRecords.length < 12 && !state.records.length) {
+      const seed = shuffle(FALLBACK_RECORDS.filter(r => r.kind === "conviction" && isDisplayEligible(r))).map(r => ({ ...r, sourceName: "Wikidata" }));
+      mergeBackgroundRecords(seed, generation);
+      const ready = await preloadPlayableImagesFromRecords(seed, Math.min(INITIAL_PRELOAD, seed.length));
+      if (ready.length) mergeBackgroundRecords(ready, generation);
+    }
+
+    state.playableRecords = shuffle(dedupePeople(state.playableRecords));
+    let acceptable = state.playableRecords.length >= MIN_ACCEPTABLE_START_CASES || (state.playableRecords.length >= 12 && state.records.length >= MIN_ACCEPTABLE_CATALOG_RECORDS);
+    if (!acceptable) {
+      acceptable = await waitForAcceptableOpening(generation);
+    }
+    if (!acceptable) throw new Error(`Opening catalog too small after waiting: ${state.playableRecords.length} playable / ${state.records.length} records`);
+
+    state.initialPoolReady = true;
+    state.isOpening = false;
+    state.lobbyReady = true;
+    $("playButton").disabled = false;
+    $("playButton").setAttribute("aria-disabled", "false");
+    $("playButton").textContent = "Open the case";
+    if (!state.lobbyClickWaiting) {
+      $("loading").classList.add("lobby-mode");
+      $("loading").classList.remove("waiting-mode");
+    }
+    $("playButton").disabled = false;
+    $("playButton").setAttribute("aria-disabled", "false");
+    $("playButton").textContent = "Open the case";
+    await saveCatalogCache();
+    renderSourcePanel();
+    return true;
+  } catch (error) {
+    console.warn("Opening pool is not ready yet", error);
+    state.initialPoolReady = false;
+    state.isOpening = true;
+    state.lobbyReady = false;
+    $("playButton").disabled = false;
+    $("playButton").setAttribute("aria-disabled", "false");
+    $("playButton").textContent = "Open the case";
+    if (!state.lobbyClickWaiting) {
+      $("loading").classList.add("lobby-mode");
+      $("loading").classList.remove("waiting-mode");
+    }
+    $("archiveRetry").classList.add("hidden");
+    return false;
+  }
+}
+
+function restartRunFromLoadedCatalog() {
+  if (!state.initialPoolReady || !state.playableRecords.length) return false;
+  document.body.classList.remove("loss-state");
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute("content", "#f8f7f2");
+  state.score = 0;
+  state.round = 0;
+  state.current = null;
+  state.answered = false;
+  state.mistakes = 0;
+  state.previousIds.clear();
+  resetHelps();
+  resetLives();
+  hideOutcome();
+  $("status").textContent = "";
+  $("status").className = "status";
+  $("score").textContent = "0";
+  $("roundLabel").textContent = "—";
+  $("answers").innerHTML = "";
+  $("answers").classList.add("hidden");
+  $("answersPlaceholder").classList.remove("hidden");
+  $("answersPlaceholder").textContent = "Loading the case image before revealing the answer choices.";
+  updatePossibleCaseCount();
+  $("poolStatus").textContent = "";
+  $("poolStatus").classList.add("ready");
+  enterGameView();
+  return true;
+}
+
+function beginArchivePreparation({ reset = true } = {}) {
+  if (reset) {
+    document.body.classList.remove("loss-state");
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", "#f8f7f2");
+    resetUiForNewGame();
+    const generation = ++state.gameGeneration;
+    state.autoPlayAfterPrepare = false;
+    state.backgroundSyncPromise = null;
+    state.score = 0; state.round = 0; state.current = null;
+    state.previousIds.clear(); state.failedIds.clear(); state.records = [];
+    state.playableRecords = [];
+    state.initialPoolReady = false;
+    state.isOpening = true;
+    state.lobbyReady = false;
+    state.lobbyClickWaiting = false;
+    for (const source of SOURCE_DEFINITIONS) sourceStats[source.key] = { status: "idle", count: 0, raw: 0 };
+    resetHelps(); resetLives();
+    $("score").textContent = "0";
+    updatePossibleCaseCount();
+    $("poolStatus").textContent = "";
+    $("poolStatus").classList.remove("ready");
+    state.backgroundSyncStartedAt = Date.now();
+    // Start all four live sources immediately while the lobby is visible.
+    state.backgroundSyncPromise = launchIndependentBackgroundSync(generation).catch(error => {
+      console.warn("Background archive sync failed during lobby", error);
+      return null;
+    });
+    state.openingPromise = prepareOpeningPool(generation);
+    return state.openingPromise;
+  }
+  if (!state.openingPromise) {
+    const generation = state.gameGeneration;
+    state.openingPromise = prepareOpeningPool(generation);
+  }
+  return state.openingPromise;
+}
+
+async function handlePlayClick() {
+  if (state.initialPoolReady) { enterGameView(); return; }
+  state.lobbyClickWaiting = true;
+  $("loading").classList.remove("lobby-mode");
+  $("loading").classList.add("waiting-mode");
+  $("playButton").disabled = true;
+  $("playButton").setAttribute("aria-disabled", "true");
+  $("playButton").textContent = "";
+  $("loadingTitle").textContent = "loading the cases from the archives";
+  $("loadingCopy").textContent = "this might take a bunch of seconds";
+  $("connectingVisual").classList.remove("hidden");
+  $("loadingProgress").classList.add("hidden");
+  const ready = await state.openingPromise;
+  if (ready && state.initialPoolReady && state.lobbyClickWaiting) {
+    $("loading").classList.remove("waiting-mode");
+    enterGameView();
+  } else {
+    // Keep the clean waiting screen while background preparation continues.
+    $("loading").classList.add("waiting-mode");
+  }
+}
+
+beginArchivePreparation();
+
+document.addEventListener("keydown", event => {
+  if ($("game").classList.contains("hidden")) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  const key = String(event.key || "").toUpperCase();
+  if (["A","B","C","D"].includes(key) && !state.answered && !$('answers').classList.contains('hidden')) {
+    const btn = [...$('answers').querySelectorAll('button')].find(b => b.dataset.letter === key && !b.disabled && !b.classList.contains('removed'));
+    if (btn) btn.click();
+  } else if (key === "1") useFiftyFifty();
+  else if (key === "2") useClue();
+  else if (key === "3") useAppeal();
+});
+
+// --- Password gate over "Open the case" ---------------------------------
+// The password itself is never stored as plain text in this file: only a
+// checksum of it is kept, and the value typed by the player is put through
+// the same checksum before being compared. Unlocking only lives in memory
+// for this page session, so a real reload asks again, but starting a new
+// game (which never reloads the page) does not.
+function gateChecksum(value) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
+}
+const GATE_CHECKSUM = "ca983094";
+
+function attemptGateUnlock() {
+  const input = $("gateInput");
+  const value = (input?.value || "").trim();
+  if (!value) return;
+  if (gateChecksum(value) === GATE_CHECKSUM) {
+    state.passwordUnlocked = true;
+    $("playGate").classList.add("hidden");
+    $("gateError").classList.add("hidden");
+    if (input) input.value = "";
+  } else {
+    $("gateError").classList.remove("hidden");
+    input?.select();
+  }
+}
+$("gateSubmit").addEventListener("click", attemptGateUnlock);
+$("gateInput").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") { ev.preventDefault(); attemptGateUnlock(); }
+  else if ($("gateError") && !$("gateError").classList.contains("hidden")) {
+    $("gateError").classList.add("hidden");
+  }
+});
+
+$("help5050").addEventListener("click", useFiftyFifty);
+$("helpClue").addEventListener("click", useClue);
+$("helpAppeal").addEventListener("click", useAppeal);
+$("nextCase").addEventListener("click", () => {
+  if ($("nextCase").textContent === "Retry game" || $("nextCase").textContent === "New game") {
+    if (!restartRunFromLoadedCatalog()) {
+      beginArchivePreparation().then(() => { if (state.initialPoolReady) enterGameView(); });
+    }
+  } else {
+    makeQuestion();
+  }
+});
+$("playButton").addEventListener("click", handlePlayClick);
+$("archiveRetry").addEventListener("click", () => { state.openingPromise = null; beginArchivePreparation(); });
+
+
+function initLegalPage() {
+  const page = $("legalPage");
+  const open = $("legalOpen");
+  const close = $("legalClose");
+  if (!page || !open || !close) return;
+  const show = (visible) => {
+    page.classList.toggle("hidden", !visible);
+    page.setAttribute("aria-hidden", String(!visible));
+    document.body.classList.toggle("legal-open-state", visible);
+    if (visible) close.focus(); else open.focus();
+  };
+  open.addEventListener("click", () => show(true));
+  close.addEventListener("click", () => show(false));
+  page.addEventListener("click", (ev) => { if (ev.target === page) show(false); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !page.classList.contains("hidden")) show(false); });
+}
+initLegalPage();
+</script>
+</body>
+</html>
