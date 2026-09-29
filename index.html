@@ -7,17 +7,6 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://query.wikidata.org https://www.wikidata.org https://api.fbi.gov https://data.opensanctions.org https://en.wikipedia.org https://*.wikipedia.org https://commons.wikimedia.org; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'none'; base-uri 'self';">
   <title>Ben-What Blanc — A Mugshot Mystery</title>
   <style>
-
-    /* =========================================================================
-       Ben-What Blanc — unified stylesheet
-       One single composition is used at every viewport size. On wide screens
-       the app simply stays capped at a comfortable width and centers itself;
-       the leftover space on the sides is filled by the page background
-       (pillarboxing), and elements that have room to grow (the photo and the
-       answer grid) stretch to fill the extra height instead of the layout
-       being restructured into a different desktop-only design.
-       ========================================================================= */
-
     :root {
       --ink: #11100e;
       --ink-soft: #1c1915;
@@ -32,15 +21,12 @@
       --bad: #9b2f38;
       --bad-bg: #edd9db;
       --border: #b6aea1;
-      /* Newspaper "print" look: a warm, slightly desaturated tint over the whole
-         app, and a harder black-and-white newsprint treatment for photographs. */
       --print-filter: sepia(.05) contrast(1.04) saturate(.88) brightness(1.01);
       --photo-print-filter: grayscale(1) contrast(1.22) brightness(1.06);
     }
 
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-    /* One paper tone for every surface: page, side bars, header, game, footer. */
     html { background: var(--paper); }
     body {
       position: relative;
@@ -55,12 +41,8 @@
       font-family: Georgia, 'Times New Roman', serif;
       color: var(--ink);
       -webkit-tap-highlight-color: transparent;
-      /* Applied here (not just on .app) so the letterbox bars on wide screens
-         get exactly the same tint as the app itself, instead of clashing. */
       filter: var(--print-filter);
     }
-    /* Printed-paper grain: a fixed, low-opacity noise texture over everything,
-       including the app itself, so the bars and the app read as one surface. */
     body::before {
       content: "";
       position: fixed;
@@ -75,8 +57,14 @@
     button { font: inherit; }
     button:focus-visible, a:focus-visible { outline: 2px solid var(--select); outline-offset: 2px; }
     .hidden { display: none !important; }
+    .db-error-banner {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: #8f1f29; color: #fff; text-align: center;
+      font: 800 .8rem/1.3 Arial, Helvetica, sans-serif;
+    }
+    .loading.stalled .loading-spinner { animation-play-state: paused; opacity: .45; }
 
-    /* ---- App frame: fixed portrait proportions, letterboxed on wide screens --- */
     .app {
       position: relative;
       z-index: 1;
@@ -90,8 +78,6 @@
       background: var(--paper);
     }
 
-    /* ---- Masthead / HUD (identical at every size). The bar itself spans the
-       full screen width; its content stays aligned with the app column. --- */
     .brand {
       flex: 0 0 auto;
       position: relative;
@@ -141,7 +127,6 @@
     .heart.stabbed::before { transform: translate(-50%, -50%) rotate(45deg); }
     .heart.stabbed::after  { transform: translate(-50%, -50%) rotate(-45deg); }
 
-    /* ---- Card shell that holds either the lobby/loading screen or the game --- */
     .game-shell {
       flex: 1 1 auto;
       min-height: 0;
@@ -152,7 +137,6 @@
       background: var(--paper);
     }
 
-    /* ---- Loading / lobby screen ---- */
     .loading {
       flex: 1 1 auto;
       min-height: 0;
@@ -169,7 +153,7 @@
       justify-content: center;
       gap: 12px;
       text-align: center;
-      overflow-y: auto;
+      overflow: hidden;
     }
     .lobby-title {
       margin: 0;
@@ -220,7 +204,8 @@
     .progress-text { margin-top: 6px; font-size: .62rem; font-weight: 800; color: var(--ink); }
     .archive-note, .ready-hint { font-size: .68rem; color: var(--muted); line-height: 1.35; }
     .loading-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-    .play-gate-wrap { position: relative; display: inline-flex; min-width: 240px; }
+    .play-gate-wrap { position: relative; display: flex; justify-content: center; width: 240px; max-width: 100%; }
+    .play-gate-wrap .play-launch { width: 100%; text-align: center; text-indent: .07em; }
     .play-gate {
       position: absolute;
       left: 0; right: 0; top: 0;
@@ -304,7 +289,6 @@
     .loading.lobby-mode .archive-note,
     .loading.lobby-mode .ready-hint { display: none; }
 
-    /* Waiting-mode: a quiet, purely-centered spinner screen. */
     .loading.waiting-mode .lobby-title,
     .loading.waiting-mode .lobby-subtitle,
     .loading.waiting-mode .lobby-rules,
@@ -314,11 +298,10 @@
     .loading.waiting-mode .ready-hint,
     .loading.waiting-mode .loading-progress { display: none; }
 
-    /* ---- Game view ---- */
     #game { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; position: relative; }
     .source-panel { display: none; }
 
-    .visual-pane { flex: 0 0 42%; min-height: 0; display: flex; flex-direction: column; gap: 7px; }
+    .visual-pane { flex: 1 1 0; min-height: 64px; display: flex; flex-direction: column; gap: 7px; }
     .round-line {
       flex: 0 0 auto;
       display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
@@ -365,7 +348,7 @@
     }
     .photo-source-tab:hover { background: var(--paper-strong); }
 
-    .play-pane { flex: 1 1 58%; min-height: 0; position: relative; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+    .play-pane { flex: 0 0 auto; position: relative; display: flex; flex-direction: column; gap: 8px; }
     .question-block { flex: 0 0 auto; }
     .question-block::before {
       content: "The Case";
@@ -383,20 +366,19 @@
     }
     .notice { display: none; }
 
-    .answers-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .answers-wrap { flex: 0 0 auto; display: flex; flex-direction: column; }
     .answers-placeholder {
-      flex: 1 1 auto; min-height: 140px;
+      flex: 0 0 auto; min-height: 120px;
       display: flex; align-items: center; justify-content: center;
       padding: 16px; border: 1px dashed var(--border); border-radius: 6px;
       color: var(--muted); text-align: center; font-size: .78rem; line-height: 1.4;
     }
     .answers {
-      flex: 1 1 auto;
-      min-height: 150px;
+      flex: 0 0 auto;
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-rows: repeat(2, minmax(72px, 1fr));
-      gap: 10px;
+      grid-auto-rows: minmax(min-content, auto);
+      gap: 8px;
     }
     .answer, .help-btn {
       border: 2px solid #28231e;
@@ -409,11 +391,11 @@
     }
     .answer {
       position: relative;
-      min-height: 0;
+      min-height: 64px;
       display: flex; flex-direction: column; justify-content: center;
-      padding: 10px 12px 10px 46px;
+      padding: 8px 10px 8px 44px;
       text-align: left;
-      overflow: hidden;
+      overflow-wrap: anywhere;
     }
     .answer::before {
       content: attr(data-letter);
@@ -436,7 +418,7 @@
     .answer.correct { border-color: var(--good) !important; background: var(--good-bg) !important; }
     .answer.wrong { border-color: var(--bad) !important; background: var(--bad-bg) !important; }
 
-    .status { min-height: 12px; margin-top: 6px; font-size: .76rem; font-weight: 800; }
+    .status { min-height: 12px; margin-top: 4px; font-size: .76rem; font-weight: 800; }
     .status.good { color: var(--good); }
     .status.bad { color: var(--bad); }
     .status.warn { color: #8b641c; }
@@ -444,7 +426,8 @@
     .help-panel {
       flex: 0 0 auto;
       position: relative;
-      padding: 10px;
+      display: grid;
+      padding: 8px 10px;
       border: 2px solid #3a332b;
       border-radius: 4px;
       background: var(--paper-muted);
@@ -457,33 +440,35 @@
     }
     .helps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .help-btn {
-      min-height: 62px;
+      min-height: 52px;
       height: auto;
-      padding: 9px 6px;
+      padding: 7px 5px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 4px;
+      gap: 3px;
       text-align: center;
       background: #f0e9dd;
     }
     .help-name { font-size: .72rem; font-weight: 900; line-height: 1.15; color: var(--ink); }
     .help-desc { display: block; font-size: .6rem; line-height: 1.3; font-weight: 650; color: var(--muted); }
     .help-btn:disabled { opacity: .32; cursor: default; box-shadow: none; }
+    .help-panel > * { grid-area: 1 / 1; min-width: 0; }
+    .help-panel > .help-title { align-self: start; }
+    .help-panel > .helps { margin-top: 18px; }
     .help-prompt {
-      position: absolute;
-      left: 0; right: 0;
-      bottom: calc(100% + 8px);
+      position: relative;
       z-index: 20;
-      padding: 9px 11px;
-      border: 1px solid #7c6e5c;
+      align-self: stretch;
+      display: flex; flex-direction: column; justify-content: center;
+      margin: -10px;
+      padding: 10px 12px;
+      border: 2px solid #3a332b;
       border-radius: 4px;
       background: #e5ddd0;
-      box-shadow: 3px 4px 0 rgba(17,16,14,.16);
     }
     .help-prompt-title { margin: 0 0 3px; font: 900 .64rem/1 Arial, Helvetica, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
     .help-prompt-copy { margin: 0; font-size: .72rem; line-height: 1.4; color: #4d4035; }
 
-    /* ---- Solution / outcome: an overlay confined to the play-pane, so it never
-       resizes the rest of the UI and never covers the photo above it ---- */
+
     .play-pane:has(#caseOutcome:not(.hidden))::after {
       content: "";
       position: absolute; inset: 0;
@@ -495,10 +480,10 @@
       left: 50%; top: 50%;
       transform: translate(-50%, -50%);
       z-index: 30;
-      width: min(92%, 420px);
-      max-height: 86%;
-      overflow-y: auto;
-      padding: 20px;
+      width: min(94%, 420px);
+      max-height: 100%;
+      overflow: hidden;
+      padding: 14px 16px;
       text-align: center;
       border: 2px solid var(--ink);
       border-radius: 4px;
@@ -521,9 +506,8 @@
     .case-outcome-score { margin: 0 0 10px; font: 900 clamp(1.5rem, 7vw, 2.1rem)/1 Arial, Helvetica, sans-serif; color: var(--ink); }
     .case-outcome-score.hidden { display: none; }
     .case-outcome-copy { margin: 0 0 8px; font-size: .84rem; font-weight: 700; color: var(--ink); }
-    .case-outcome-detail { margin: 0 0 14px; font-size: .76rem; line-height: 1.42; color: var(--muted); }
+    .case-outcome-detail { margin: 0 0 10px; font-size: .76rem; line-height: 1.42; color: var(--muted); }
 
-    /* ---- Footer: also spans the full screen width ---- */
     .footer {
       flex: 0 0 auto;
       position: relative;
@@ -542,7 +526,6 @@
     .footer-link { border: 0; background: none; padding: 0; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
     .footer-meta { display: inline-flex; gap: 10px; }
 
-    /* ---- Legal / attribution page ---- */
     .legal-page {
       position: fixed; inset: 0; z-index: 100;
       display: grid; place-items: center;
@@ -578,7 +561,6 @@
     .legal-body p { margin: 8px 0; }
     .legal-body a { color: var(--accent); }
 
-    /* ---- Loss state (three mistakes made) ---- */
     body.loss-state, body.loss-state .app, body.loss-state .brand,
     body.loss-state .game-shell, body.loss-state .footer { background: #f2dedb; }
     body.loss-state .brand { border-color: #4b2526; }
@@ -588,7 +570,6 @@
 
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-    /* ---- Small comfort tweaks at the very narrow end; same layout throughout --- */
     @media (max-width: 380px) {
       .brand { padding: 8px 10px; }
       #game { padding: 9px; gap: 8px; }
@@ -596,10 +577,35 @@
       .helps { gap: 6px; }
       .lobby-rules { gap: 8px; }
     }
+    @media (max-height: 760px) {
+      #game { padding: 8px 10px; gap: 6px; }
+      .brand { padding-top: 6px; padding-bottom: 6px; }
+      .brand .tagline { display: none; }
+      .question { font-size: clamp(.92rem, 4vw, 1.1rem); }
+      .question-block::before { margin-bottom: 2px; }
+      .answer-label { font-size: .8rem; }
+      .answer-meaning { margin-top: 2px; font-size: .62rem; line-height: 1.2; }
+      .answer { min-height: 54px; padding: 6px 8px 6px 40px; }
+      .answer::before { width: 22px; height: 22px; left: 8px; font-size: .68rem; }
+      .help-title { margin-bottom: 5px; }
+      .help-panel > .helps { margin-top: 14px; }
+      .help-btn { min-height: 44px; padding: 5px 4px; }
+      .help-desc { font-size: .55rem; line-height: 1.2; }
+      .loading-inner { padding: 12px 16px; gap: 8px; }
+      .lobby-title { font-size: clamp(1.6rem, 8vw, 2.2rem); }
+      .lobby-title::before { margin-bottom: 6px; }
+      .rule-card { padding: 7px 10px; }
+      .lobby-rules { gap: 7px; margin: 0; }
+    }
+    @media (max-height: 600px) {
+      .answer-meaning { display: none; }
+      .answer { min-height: 46px; }
+    }
     @media (max-height: 620px) {
-      .visual-pane { flex-basis: 36%; }
-      .play-pane { flex-basis: 64%; }
       .lobby-rules { display: none; }
+      .help-desc { display: none; }
+      .help-btn { min-height: 34px; }
+      .help-panel > .helps { margin-top: 12px; }
     }
 </style>
 </head>
@@ -733,6 +739,7 @@
       <span>Public-record game · <button type="button" class="footer-link legal-open" id="legalOpen">Legal & attribution</button></span>
       <span class="footer-meta"><span>v2.6.0</span><span>by LeBeaas</span></span>
     </footer>
+    <div id="dbErrorBanner" class="db-error-banner hidden" role="alert">The databases are currently unreachable. Please try again later.</div>
 
     <section id="legalPage" class="legal-page hidden" aria-hidden="true">
       <div class="legal-sheet" role="dialog" aria-modal="true" aria-labelledby="legalTitle">
@@ -2202,6 +2209,14 @@ function showHelpPrompt(title, copy) {
   $("helpPromptTitle").textContent = title;
   $("helpPromptCopy").textContent = copy;
   $("helpPrompt").classList.remove("hidden");
+  // The prompt covers the bar: only one help can be used per case.
+  ["help5050", "helpClue", "helpAppeal"].forEach(id => { $(id).disabled = true; });
+}
+
+function restoreHelpButtons() {
+  $("help5050").disabled = state.used.fifty;
+  $("helpClue").disabled = state.used.clue;
+  $("helpAppeal").disabled = state.used.appeal;
 }
 
 function offenseDetailText(record) {
@@ -2287,6 +2302,7 @@ function showOutcome({correct, gameOver = false, chosen = null}) {
   // Once an answer is resolved, collapse any open help prompt so the result and
   // Next case control always have their own space on small screens.
   $("helpPrompt").classList.add("hidden");
+  restoreHelpButtons();
   const outcome = $("caseOutcome");
   outcome.classList.remove("hidden", "good", "bad");
   outcome.setAttribute("aria-hidden", "false");
@@ -2339,6 +2355,7 @@ function makeQuestion() {
   $("status").className = "status";
   hideOutcome();
   $("helpPrompt").classList.add("hidden");
+  restoreHelpButtons();
   $("answers").classList.add("hidden");
   $("answers").innerHTML = "";
   $("answersPlaceholder").classList.remove("hidden");
@@ -2551,7 +2568,7 @@ function answer(choice, clickedButton) {
 }
 
 function useFiftyFifty() {
-  if (state.used.fifty || state.answered || $("answers").classList.contains("hidden")) return;
+  if (state.used.fifty || !$("helpPrompt").classList.contains("hidden") || state.answered || $("answers").classList.contains("hidden")) return;
   state.used.fifty = true;
   $("help5050").disabled = true;
   const wrongButtons = shuffle([...( $("answers").querySelectorAll("button") )].filter(b => b.dataset.choice !== state.current.crime));
@@ -2560,14 +2577,14 @@ function useFiftyFifty() {
 }
 
 function useClue() {
-  if (state.used.clue || state.answered || $("answers").classList.contains("hidden")) return;
+  if (state.used.clue || !$("helpPrompt").classList.contains("hidden") || state.answered || $("answers").classList.contains("hidden")) return;
   state.used.clue = true;
   $("helpClue").disabled = true;
   showHelpPrompt("Case note", buildNeutralRecordDescription(state.current));
 }
 
 function useAppeal() {
-  if (state.used.appeal || state.answered || $("answers").classList.contains("hidden")) return;
+  if (state.used.appeal || !$("helpPrompt").classList.contains("hidden") || state.answered || $("answers").classList.contains("hidden")) return;
   state.used.appeal = true;
   state.appealActive = true;
   $("helpAppeal").disabled = true;
@@ -2798,6 +2815,8 @@ async function prepareOpeningPool(generation) {
     if (!acceptable) throw new Error(`Opening catalog too small after waiting: ${state.playableRecords.length} playable / ${state.records.length} records`);
 
     state.initialPoolReady = true;
+    clearTimeout(dbWatchdogTimer);
+    setDbUnreachable(false);
     state.isOpening = false;
     state.lobbyReady = true;
     $("playButton").disabled = false;
@@ -2859,6 +2878,26 @@ function restartRunFromLoadedCatalog() {
   return true;
 }
 
+const DB_UNREACHABLE_TIMEOUT_MS = 30000;
+const DB_UNREACHABLE_MIN_CASES = 15;
+let dbWatchdogTimer = null;
+
+function setDbUnreachable(flag) {
+  state.dbUnreachable = flag;
+  $("dbErrorBanner").classList.toggle("hidden", !flag);
+  $("loading").classList.toggle("stalled", flag);
+}
+
+function startDbWatchdog(generation) {
+  clearTimeout(dbWatchdogTimer);
+  setDbUnreachable(false);
+  dbWatchdogTimer = setTimeout(() => {
+    if (generation !== state.gameGeneration) return;
+    if (state.initialPoolReady || state.playableRecords.length >= DB_UNREACHABLE_MIN_CASES) return;
+    setDbUnreachable(true);
+  }, DB_UNREACHABLE_TIMEOUT_MS);
+}
+
 function beginArchivePreparation({ reset = true } = {}) {
   if (reset) {
     document.body.classList.remove("loss-state");
@@ -2888,6 +2927,7 @@ function beginArchivePreparation({ reset = true } = {}) {
       return null;
     });
     state.openingPromise = prepareOpeningPool(generation);
+    startDbWatchdog(generation);
     return state.openingPromise;
   }
   if (!state.openingPromise) {
